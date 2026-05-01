@@ -1,0 +1,106 @@
+mod ai;
+mod audio;
+mod commands;
+mod error;
+mod groq;
+mod paste;
+mod settings;
+mod whisper_engine;
+
+use commands::AppState;
+use tauri::Manager;
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    tauri::Builder::default()
+        .plugin(tauri_plugin_store::Builder::default().build())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_shell::init())
+        .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(|app, _shortcut, event| {
+                    let settings = commands::load_settings(app);
+                    let state = app.state::<AppState>();
+                    let rs = state.recording_state.lock().unwrap().clone();
+
+                    match settings.recording_mode {
+                        settings::RecordingMode::Toggle => {
+                            if event.state == ShortcutState::Pressed {
+                                let app = app.clone();
+                                match rs {
+                                    commands::RecordingState::Idle => {
+                                        tauri::async_runtime::spawn(async move {
+                                            if let Err(e) = commands::execute_start(app).await {
+                                                log::error!("hotkey start failed: {e}");
+                                            }
+                                        });
+                                    }
+                                    commands::RecordingState::Recording => {
+                                        tauri::async_runtime::spawn(async move {
+                                            if let Err(e) = commands::execute_stop(app).await {
+                                                log::error!("hotkey stop failed: {e}");
+                                            }
+                                        });
+                                    }
+                                    commands::RecordingState::Processing => {}
+                                }
+                            }
+                        }
+                        settings::RecordingMode::PushToTalk => {
+                            let app = app.clone();
+                            match event.state {
+                                ShortcutState::Pressed => {
+                                    if rs == commands::RecordingState::Idle {
+                                        tauri::async_runtime::spawn(async move {
+                                            if let Err(e) = commands::execute_start(app).await {
+                                                log::error!("hotkey start failed: {e}");
+                                            }
+                                        });
+                                    }
+                                }
+                                ShortcutState::Released => {
+                                    if rs == commands::RecordingState::Recording {
+                                        tauri::async_runtime::spawn(async move {
+                                            if let Err(e) = commands::execute_stop(app).await {
+                                                log::error!("hotkey stop failed: {e}");
+                                            }
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
+                })
+                .build(),
+        )
+        .setup(|app| {
+            let app_data_dir = app.path().app_data_dir()?;
+            std::fs::create_dir_all(&app_data_dir)?;
+            app.manage(AppState::new(app_data_dir));
+
+            let settings = commands::load_settings(app.handle());
+            if let Err(e) = app
+                .handle()
+                .global_shortcut()
+                .register(settings.hotkey.as_str())
+            {
+                log::warn!("Failed to register hotkey '{}': {e}", settings.hotkey);
+            }
+
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![
+            commands::start_recording,
+            commands::stop_recording,
+            commands::cancel_recording,
+            commands::list_microphones,
+            commands::get_installed_models,
+            commands::download_model,
+            commands::delete_model,
+            commands::get_settings,
+            commands::update_settings,
+        ])
+        .run(tauri::generate_context!())
+        .expect("error while running iSpeak");
+}
