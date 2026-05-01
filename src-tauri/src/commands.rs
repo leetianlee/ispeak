@@ -13,7 +13,7 @@ use crate::audio::{self, MicrophoneDevice};
 use crate::error::{AppError, Result};
 use crate::groq;
 use crate::paste;
-use crate::settings::{mask_key, AppSettings, TranscriptionEngine, WhisperModel};
+use crate::settings::{mask_key, AIMode, AppSettings, TranscriptionEngine, WhisperModel};
 use crate::whisper_engine;
 
 // ─── App state ───────────────────────────────────────────────────────────────
@@ -183,7 +183,24 @@ pub(crate) async fn execute_stop<R: Runtime>(app: AppHandle<R>) -> Result<Transc
         }
     };
 
-    let text = raw_text.clone();
+    // AI post-processing (non-fatal — falls back to raw_text)
+    let ai_mode = settings.ai_mode.clone();
+    let text = if ai_mode != AIMode::Off {
+        match crate::ai::post_process(&raw_text, &ai_mode, &settings).await {
+            Ok(processed) => processed,
+            Err(e) => {
+                log::warn!("AI post-processing failed, using raw text: {e}");
+                app.emit("app_error", serde_json::json!({
+                    "code": "ai_post_process",
+                    "message": e.to_string(),
+                })).ok();
+                raw_text.clone()
+            }
+        }
+    } else {
+        raw_text.clone()
+    };
+
     let clipboard_text = text.clone();
     tokio::task::spawn_blocking(move || -> crate::error::Result<()> {
         let mut clipboard = arboard::Clipboard::new()
@@ -201,7 +218,7 @@ pub(crate) async fn execute_stop<R: Runtime>(app: AppHandle<R>) -> Result<Transc
         raw_text,
         duration_ms,
         engine: format!("{:?}", settings.transcription_engine).to_lowercase(),
-        ai_mode: "off".to_string(),
+        ai_mode: format!("{:?}", ai_mode).to_lowercase(),
         timestamp: chrono::Utc::now().to_rfc3339(),
     };
 

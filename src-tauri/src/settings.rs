@@ -26,7 +26,7 @@ impl Default for TranscriptionEngine {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AIMode {
     Off,
