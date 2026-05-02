@@ -55,27 +55,16 @@ macOS 26 (Tahoe) broke `pthread_main_np()` — it returns 0 during `applicationD
 
 Upstream bug: https://github.com/tauri-apps/tao/issues/1171
 
-### The Fix — 2 patches instead of 30+
-Instead of patching 30+ individual `MainThreadMarker::new()` call sites, we patched the root:
+### The Fix — 2 forked crates
+Instead of patching 30+ individual `MainThreadMarker::new()` call sites, we patched the root function in two crates:
 
-1. **objc2 `is_main_thread()`** — `vendor/objc2/src/main_thread_marker.rs`: hardcoded to return `true` on Apple platforms. Safe because Tauri runs everything on the main thread.
-2. **tao `util::is_main_thread()`** — `vendor/tao/src/platform_impl/macos/util/async.rs`: same fix, same rationale.
-3. **Regenerated `icon.icns`** from `icon.png` (was 8 bytes, now 5127 bytes with proper iconset).
+1. **objc2 `is_main_thread()`** — hardcoded to return `true` on Apple platforms. Fork: `leetianlee/objc2` branch `macos26-fix`.
+2. **tao `util::is_main_thread()`** — same fix. Fork: `leetianlee/tao` branch `macos26-fix`.
+3. **Regenerated `icon.icns`** from `icon.png` (was 8 bytes, now proper iconset).
 
-All previous per-site `unsafe { new_unchecked() }` patches were reverted — the crate code now uses standard `new().unwrap()` / `new().expect()` / `new().ok_or()` which all work because `new()` always returns `Some`.
+Both forks are referenced via `[patch.crates-io]` in `src-tauri/Cargo.toml`. No vendor directory needed. Cargo pulls the forks automatically during build.
 
-### Vendor patch maintenance
-When modifying vendored crate sources:
-```python
-import json, hashlib
-path = "vendor/<crate>/.cargo-checksum.json"
-with open(path) as f: data = json.load(f)
-rel = "src/path/to/file.rs"
-with open(f"vendor/<crate>/{rel}", "rb") as f:
-    data["files"][rel] = hashlib.sha256(f.read()).hexdigest()
-with open(path, "w") as f: json.dump(data, f)
-```
-Then `cargo clean -p <crate>` from `src-tauri/` to force recompile.
+When upstream fixes the macOS 26 issue, remove the `[patch.crates-io]` section and delete the forks.
 
 ---
 
@@ -100,8 +89,6 @@ src-tauri/
     paste.rs                  enigo Cmd+V simulation
     settings.rs               AppSettings struct + store helpers
     error.rs                  AppError with Serialize impl
-  vendor/                     Patched crate sources (cargo vendor)
-  .cargo/config.toml          Points cargo at vendor/
   tauri.conf.json             Window config (main 620x540, indicator 48x48)
   entitlements.plist          Microphone + accessibility entitlements
   Info.plist                  NSMicrophoneUsageDescription etc.
@@ -131,7 +118,14 @@ public/
 - **Phase 3**: Meeting transcription mode (long recordings, speaker diarisation, export)
 - **Phase 4**: OSS release prep (README, CI, code signing)
 
-## Design Docs
+## Design Context
 
+- `PRODUCT.md` — product register, users, brand personality, anti-references, design principles
+- `DESIGN.md` — visual system ("The Voice Channel"), color tokens, typography, components, do's/don'ts
 - `docs/superpowers/specs/2026-05-01-phase2-ai-post-processing-design.md` — Phase 2 design spec
 - `docs/superpowers/plans/2026-05-01-phase2-ai-post-processing.md` — Phase 2 implementation plan
+
+## Repository
+
+- GitHub: https://github.com/leetianlee/ispeak
+- Forked crates for macOS 26 fix: `leetianlee/objc2` and `leetianlee/tao` (branch `macos26-fix` on each)
