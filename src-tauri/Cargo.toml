@@ -1,0 +1,70 @@
+[package]
+name = "ispeak"
+version = "0.1.0"
+description = "iSpeak — local-first voice-to-text"
+authors = ["Tian Lee"]
+license = "MIT"
+repository = ""
+edition = "2021"
+rust-version = "1.77"
+
+[lib]
+name = "ispeak_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [ "tray-icon", "image-ico", "image-png"] }
+tauri-plugin-global-shortcut = "2"
+tauri-plugin-store = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-shell = "2"
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+
+# Audio capture
+cpal = "0.15"
+
+# Resampling raw audio to 16kHz for Whisper
+rubato = "0.15"
+
+# Local Whisper transcription
+whisper-rs = { version = "0.11", features = ["metal"] }
+
+# HTTP client for Groq API
+reqwest = { version = "0.12", features = ["json", "stream", "multipart"] }
+
+# Stream utilities for download progress
+futures-util = "0.3"
+
+# Clipboard access
+arboard = "3"
+
+# Keyboard simulation for paste
+enigo = "0.2"
+
+# Date/time for transcript timestamps
+chrono = { version = "0.4", features = ["serde"] }
+
+# Error derive macro
+thiserror = "1"
+
+# Logging
+log = "0.4"
+env_logger = "0.11"
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
+
+# macOS 26 (Tahoe) fix: pthread_main_np() returns 0 on the main thread
+# during applicationDidFinishLaunching. These forks hardcode is_main_thread()
+# to return true. Safe because Tauri runs everything on the main thread.
+# Upstream: https://github.com/tauri-apps/tao/issues/1171
+[patch.crates-io]
+objc2 = { git = "https://github.com/leetianlee/objc2.git", branch = "macos26-fix" }
+tao = { git = "https://github.com/leetianlee/tao.git", branch = "macos26-fix" }

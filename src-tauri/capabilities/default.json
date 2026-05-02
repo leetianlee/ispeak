@@ -1,0 +1,14 @@
+{
+  "identifier": "default",
+  "description": "Default capabilities for iSpeak",
+  "windows": ["main", "indicator"],
+  "permissions": [
+    "core:default",
+    "store:allow-get",
+    "store:allow-set",
+    "store:allow-save",
+    "store:allow-load",
+    "dialog:allow-message",
+    "shell:allow-open"
+  ]
+}
