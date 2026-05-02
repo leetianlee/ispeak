@@ -125,6 +125,13 @@ public/
 - `docs/superpowers/specs/2026-05-01-phase2-ai-post-processing-design.md` — Phase 2 design spec
 - `docs/superpowers/plans/2026-05-01-phase2-ai-post-processing.md` — Phase 2 implementation plan
 
+## Next Steps
+
+- **AI eval (before Phase 3):** Collect 20-30 real dictation samples, run each through Off/Ollama/Haiku/Sonnet, manually judge whether output is better/same/worse than raw transcription. Evaluate: correction quality, meaning preservation, latency. No framework needed, just a spreadsheet.
+- **Phase 2.1:** App-context-aware prompts (detect frontmost app via Accessibility API, adjust prompt for Slack vs VS Code vs Mail)
+- **Phase 3:** Meeting transcription mode
+- **Phase 4:** OSS release prep
+
 ## Repository
 
 - GitHub: https://github.com/leetianlee/ispeak
