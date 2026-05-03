@@ -14,9 +14,6 @@ pub enum AppError {
     #[error("Ollama error: {0}")]
     Ollama(String),
 
-    #[error("Anthropic API error: {0}")]
-    Anthropic(String),
-
     #[error("Settings error: {0}")]
     Settings(String),
 

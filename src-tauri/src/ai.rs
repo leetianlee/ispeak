@@ -21,16 +21,12 @@ pub async fn post_process(
             ollama_complete(raw_text, &settings.ollama_base_url, &settings.ollama_model).await?
         }
         AIMode::CloudFast => {
-            anthropic_complete(raw_text, &settings.anthropic_api_key, "claude-haiku-4-5-20251001")
+            groq_chat_complete(raw_text, &settings.groq_api_key, "llama-3.3-70b-versatile")
                 .await?
         }
         AIMode::CloudQuality => {
-            anthropic_complete(
-                raw_text,
-                &settings.anthropic_api_key,
-                "claude-sonnet-4-5-20250514",
-            )
-            .await?
+            groq_chat_complete(raw_text, &settings.groq_api_key, "llama-3.3-70b-specdec")
+                .await?
         }
     };
 
@@ -102,85 +98,91 @@ async fn ollama_complete(text: &str, base_url: &str, model: &str) -> Result<Stri
     Ok(parsed.response)
 }
 
-// ─── Anthropic ───────────────────────────────────────────────────────────────
+// ─── Groq Chat ──────────────────────────────────────────────────────────────
 
 #[derive(Serialize)]
-struct AnthropicRequest<'a> {
+struct GroqChatRequest<'a> {
     model: &'a str,
+    messages: Vec<GroqChatMessage<'a>>,
     max_tokens: u32,
-    system: &'a str,
-    messages: Vec<AnthropicMessage<'a>>,
 }
 
 #[derive(Serialize)]
-struct AnthropicMessage<'a> {
+struct GroqChatMessage<'a> {
     role: &'a str,
     content: &'a str,
 }
 
 #[derive(Deserialize)]
-struct AnthropicResponse {
-    content: Vec<AnthropicContent>,
+struct GroqChatResponse {
+    choices: Vec<GroqChatChoice>,
 }
 
 #[derive(Deserialize)]
-struct AnthropicContent {
-    text: String,
+struct GroqChatChoice {
+    message: GroqChatChoiceMessage,
 }
 
-async fn anthropic_complete(text: &str, api_key: &str, model: &str) -> Result<String> {
+#[derive(Deserialize)]
+struct GroqChatChoiceMessage {
+    content: String,
+}
+
+async fn groq_chat_complete(text: &str, api_key: &str, model: &str) -> Result<String> {
     if api_key.is_empty() {
-        return Err(AppError::Anthropic(
-            "Anthropic API key not set".to_string(),
-        ));
+        return Err(AppError::Groq("Groq API key not set".to_string()));
     }
 
     let client = Client::builder()
         .timeout(TIMEOUT)
         .build()
-        .map_err(|e| AppError::Anthropic(e.to_string()))?;
+        .map_err(|e| AppError::Groq(e.to_string()))?;
 
-    let body = AnthropicRequest {
+    let body = GroqChatRequest {
         model,
+        messages: vec![
+            GroqChatMessage {
+                role: "system",
+                content: SYSTEM_PROMPT,
+            },
+            GroqChatMessage {
+                role: "user",
+                content: text,
+            },
+        ],
         max_tokens: 4096,
-        system: SYSTEM_PROMPT,
-        messages: vec![AnthropicMessage {
-            role: "user",
-            content: text,
-        }],
     };
 
     let resp = client
-        .post("https://api.anthropic.com/v1/messages")
-        .header("x-api-key", api_key)
-        .header("anthropic-version", "2023-06-01")
+        .post("https://api.groq.com/openai/v1/chat/completions")
+        .header("Authorization", format!("Bearer {api_key}"))
         .header("content-type", "application/json")
         .json(&body)
         .send()
         .await
         .map_err(|e| {
             if e.is_timeout() {
-                AppError::Anthropic("Request timed out (10s)".to_string())
+                AppError::Groq("Request timed out (10s)".to_string())
             } else {
-                AppError::Anthropic(e.to_string())
+                AppError::Groq(e.to_string())
             }
         })?;
 
     if !resp.status().is_success() {
         let status = resp.status();
         let body = resp.text().await.unwrap_or_default();
-        return Err(AppError::Anthropic(format!("HTTP {status}: {body}")));
+        return Err(AppError::Groq(format!("HTTP {status}: {body}")));
     }
 
-    let parsed: AnthropicResponse = resp
+    let parsed: GroqChatResponse = resp
         .json()
         .await
-        .map_err(|e| AppError::Anthropic(format!("Failed to parse response: {e}")))?;
+        .map_err(|e| AppError::Groq(format!("Failed to parse response: {e}")))?;
 
     parsed
-        .content
+        .choices
         .into_iter()
         .next()
-        .map(|c| c.text)
-        .ok_or_else(|| AppError::Anthropic("Empty content in response".to_string()))
+        .map(|c| c.message.content)
+        .ok_or_else(|| AppError::Groq("Empty choices in response".to_string()))
 }
