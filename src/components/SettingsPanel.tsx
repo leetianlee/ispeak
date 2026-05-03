@@ -193,8 +193,8 @@ export function SettingsPanel() {
                 options={[
                   { value: "off", label: "Off", desc: "Raw transcription, zero latency" },
                   { value: "local", label: "Local (Ollama)", desc: "Free, ~300ms extra, requires Ollama running" },
-                  { value: "cloud_fast", label: "Cloud Fast", desc: "Claude Haiku, ~$0.001/call" },
-                  { value: "cloud_quality", label: "Cloud Quality", desc: "Claude Sonnet, ~$0.005/call" },
+                  { value: "cloud_fast", label: "Cloud Fast", desc: "Groq Llama 70B, fast" },
+                  { value: "cloud_quality", label: "Cloud Quality", desc: "Groq Llama 70B, quality" },
                 ]}
                 onChange={(v) => save({ ai_mode: v })}
               />
@@ -224,10 +224,10 @@ export function SettingsPanel() {
             {(settings.ai_mode === "cloud_fast" || settings.ai_mode === "cloud_quality") && (
               <Section title="API Key">
                 <ApiKeyField
-                  label="Anthropic API Key"
-                  value={settings.anthropic_api_key}
-                  placeholder="sk-ant-..."
-                  onSave={(v) => save({ anthropic_api_key: v })}
+                  label="Groq API Key"
+                  value={settings.groq_api_key}
+                  placeholder="gsk_..."
+                  onSave={(v) => save({ groq_api_key: v })}
                 />
               </Section>
             )}

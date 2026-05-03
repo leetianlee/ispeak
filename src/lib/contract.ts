@@ -69,8 +69,6 @@ export interface AppSettings {
   ollama_base_url: string
   /** API keys — returned masked (e.g. "sk-...xxxx") on read. Write full key to update. */
   groq_api_key: string
-  anthropic_api_key: string
-  deepgram_api_key: string
   /** Device ID from listMicrophones(), or null to use system default. */
   microphone_id: string | null
   /** Screen position of the floating recording indicator. */
