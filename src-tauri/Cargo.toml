@@ -57,6 +57,11 @@ thiserror = "1"
 log = "0.4"
 env_logger = "0.11"
 
+# Frontmost app detection (macOS) — objc2 already a transitive dep via tauri
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2-app-kit = { version = "0.3", features = ["NSWorkspace", "NSRunningApplication"] }
+objc2-foundation = { version = "0.3" }
+
 [features]
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]

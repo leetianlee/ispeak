@@ -6,6 +6,7 @@ mod groq;
 mod paste;
 mod settings;
 mod whisper_engine;
+mod frontmost_app;
 
 use commands::AppState;
 use tauri::Manager;
