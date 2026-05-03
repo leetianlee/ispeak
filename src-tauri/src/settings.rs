@@ -118,15 +118,6 @@ pub struct AppSettings {
     pub groq_api_key: String,
 
     #[serde(default)]
-    pub anthropic_api_key: String,
-
-    #[serde(default)]
-    pub openai_api_key: String,
-
-    #[serde(default)]
-    pub deepgram_api_key: String,
-
-    #[serde(default)]
     pub microphone_id: Option<String>,
 
     #[serde(default)]
@@ -170,9 +161,6 @@ impl Default for AppSettings {
             ollama_model: default_ollama_model(),
             ollama_base_url: default_ollama_base_url(),
             groq_api_key: String::new(),
-            anthropic_api_key: String::new(),
-            openai_api_key: String::new(),
-            deepgram_api_key: String::new(),
             microphone_id: None,
             indicator_position: IndicatorPosition::default(),
             max_recording_duration_s: default_max_duration(),

@@ -354,9 +354,6 @@ pub fn get_settings<R: Runtime>(app: AppHandle<R>) -> AppSettings {
     let mut settings = load_settings(&app);
     // Mask keys before sending to frontend
     settings.groq_api_key = mask_key(&settings.groq_api_key);
-    settings.anthropic_api_key = mask_key(&settings.anthropic_api_key);
-    settings.openai_api_key = mask_key(&settings.openai_api_key);
-    settings.deepgram_api_key = mask_key(&settings.deepgram_api_key);
     settings
 }
 
@@ -375,7 +372,7 @@ pub fn update_settings<R: Runtime>(
             // Don't overwrite real keys with masked values
             let is_key_field = matches!(
                 key.as_str(),
-                "groq_api_key" | "anthropic_api_key" | "openai_api_key" | "deepgram_api_key"
+                "groq_api_key"
             );
             if is_key_field {
                 if let Some(s) = value.as_str() {
@@ -431,9 +428,6 @@ pub(crate) fn load_settings<R: Runtime>(app: &AppHandle<R>) -> AppSettings {
         ollama_model: get!("ollama_model", "llama3.2:3b".to_string()),
         ollama_base_url: get!("ollama_base_url", "http://localhost:11434".to_string()),
         groq_api_key: get!("groq_api_key", String::new()),
-        anthropic_api_key: get!("anthropic_api_key", String::new()),
-        openai_api_key: get!("openai_api_key", String::new()),
-        deepgram_api_key: get!("deepgram_api_key", String::new()),
         microphone_id: get!("microphone_id", None),
         indicator_position: get!("indicator_position", Default::default()),
         max_recording_duration_s: get!("max_recording_duration_s", 60),
