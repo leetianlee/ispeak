@@ -30,8 +30,8 @@ Requires: Node 18+, Rust (rustup), cmake (conda install -c conda-forge cmake).
 
 **Phase 2 (AI Post-Processing):** Implemented May 2026. After transcription, optionally runs text through an LLM for grammar/punctuation correction before pasting. Three AI modes:
 - **Local (Ollama)** — free, ~300ms extra, configurable model (default `llama3.2:3b`)
-- **Cloud Fast** — Claude Haiku via Anthropic API
-- **Cloud Quality** — Claude Sonnet via Anthropic API
+- **Cloud Fast** — Groq Llama 3.3 70B (versatile)
+- **Cloud Quality** — Groq Llama 3.3 70B (specdec)
 - AI failure is non-fatal — always falls back to raw transcription text
 
 **UI Overhaul:** Also completed May 2026:
@@ -82,7 +82,7 @@ src-tauri/
   src/
     lib.rs                    Tauri app entry, plugin registration
     commands.rs               All tauri::command handlers
-    ai.rs                     AI post-processing (Ollama + Anthropic clients)
+    ai.rs                     AI post-processing (Ollama + Groq chat completions)
     audio.rs                  cpal mic capture + rubato resampling to 16kHz mono
     whisper_engine.rs         whisper-rs (Metal GPU) local transcription
     groq.rs                   Groq Whisper API (cloud fallback)
@@ -100,21 +100,21 @@ public/
 
 ## Key Technical Notes
 
-- **No tray icon in tauri.conf.json** (stripped during debugging; re-add as next step)
+- **Tray icon** in menu bar — click toggles main window visibility (added May 2026)
 - **tauri_plugin_global_shortcut** registered in lib.rs with handler for both PTT and toggle modes
 - **Audio capture starts immediately** on hotkey press via background `spawn_blocking` task; `execute_stop` signals the stop flag and awaits the handle (fixed April 2026 — previously audio::record was called after stop_flag was set, capturing ~0 audio)
 - **AI post-processing** in `execute_stop()` runs between transcription and clipboard write; non-fatal with fallback to raw_text
 - **arboard** (not Tauri's clipboard API) is used for clipboard write — Tauri 2's clipboard API has permission issues
 - **enigo** simulates Cmd+V to paste — requires Accessibility permission granted by user (release binary needs separate permission grant from dev build)
 - Recording state machine lives entirely in Rust (IDLE → RECORDING → PROCESSING → IDLE)
-- **Contract simplification (May 2026):** Removed `AIProvider` type and `openai_api_key` from contract.ts. Cloud AI modes use Anthropic only (Haiku for fast, Sonnet for quality). Fixed mapping, no provider selector.
+- **Contract simplification (May 2026):** Removed `AIProvider` type, `openai_api_key`, `anthropic_api_key`, `deepgram_api_key` from contract.ts. Cloud AI modes use Groq only (Llama 70B versatile for fast, specdec for quality). Single `groq_api_key` for both transcription and AI post-processing.
 
 ---
 
 ## Phase Roadmap (from SPEC.md)
 
 - **Phase 1** (DONE): Core dictation — hotkey, record, local/Groq transcription, paste
-- **Phase 2** (DONE): AI post-processing via Ollama (local) or Anthropic (cloud). Universal grammar/punctuation prompt. App-context-aware prompts deferred to Phase 2.1.
+- **Phase 2** (DONE): AI post-processing via Ollama (local) or Groq (cloud). Universal grammar/punctuation prompt. App-context-aware prompts deferred to Phase 2.1.
 - **Phase 3**: Meeting transcription mode (long recordings, speaker diarisation, export)
 - **Phase 4**: OSS release prep (README, CI, code signing)
 
@@ -127,7 +127,7 @@ public/
 
 ## Next Steps
 
-- **AI eval (before Phase 3):** Collect 20-30 real dictation samples, run each through Off/Ollama/Haiku/Sonnet, manually judge whether output is better/same/worse than raw transcription. Evaluate: correction quality, meaning preservation, latency. No framework needed, just a spreadsheet.
+- **AI eval (before Phase 3):** Template at `docs/ai-eval.csv`. Collect 20-30 real dictation samples, run each through Off/Ollama/Groq Fast/Groq Quality, manually judge correction quality, meaning preservation, latency.
 - **Phase 2.1:** App-context-aware prompts (detect frontmost app via Accessibility API, adjust prompt for Slack vs VS Code vs Mail)
 - **Phase 3:** Meeting transcription mode
 - **Phase 4:** OSS release prep
