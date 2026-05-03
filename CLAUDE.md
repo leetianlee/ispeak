@@ -24,7 +24,7 @@ Requires: Node 18+, Rust (rustup), cmake (conda install -c conda-forge cmake).
 
 ---
 
-## Current Status: Phase 1 + Phase 2 COMPLETE on macOS 26
+## Current Status: Phase 1 + Phase 2 + Phase 2.1 COMPLETE on macOS 26
 
 **Phase 1 (Dictation Core):** App launches, global hotkey works (both push-to-talk and toggle modes), audio capture → transcription → clipboard → paste all functional.
 
@@ -33,6 +33,8 @@ Requires: Node 18+, Rust (rustup), cmake (conda install -c conda-forge cmake).
 - **Cloud Fast** — Groq Llama 3.3 70B (versatile)
 - **Cloud Quality** — Groq Llama 3.3 70B (specdec)
 - AI failure is non-fatal — always falls back to raw transcription text
+
+**Phase 2.1 (App-Context-Aware Prompts):** Implemented May 2026. Detects the frontmost macOS app via `NSWorkspace` and appends a context hint to the AI system prompt. Chat apps (Slack/Teams/Discord) get casual tone, email apps get formatting-aware corrections, code editors get minimal punctuation, terminals get command-friendly style, Claude gets LLM-prompt-aware prose. Falls back to default grammar correction for unrecognised apps.
 
 **UI Overhaul:** Also completed May 2026:
 - Custom app icon (lowercase "i" with mic-capsule dot on indigo gradient squircle)
@@ -82,7 +84,8 @@ src-tauri/
   src/
     lib.rs                    Tauri app entry, plugin registration
     commands.rs               All tauri::command handlers
-    ai.rs                     AI post-processing (Ollama + Groq chat completions)
+    ai.rs                     AI post-processing (Ollama + Groq) with app-context-aware prompts
+    frontmost_app.rs          Frontmost macOS app detection via NSWorkspace
     audio.rs                  cpal mic capture + rubato resampling to 16kHz mono
     whisper_engine.rs         whisper-rs (Metal GPU) local transcription
     groq.rs                   Groq Whisper API (cloud fallback)
@@ -114,7 +117,8 @@ public/
 ## Phase Roadmap (from SPEC.md)
 
 - **Phase 1** (DONE): Core dictation — hotkey, record, local/Groq transcription, paste
-- **Phase 2** (DONE): AI post-processing via Ollama (local) or Groq (cloud). Universal grammar/punctuation prompt. App-context-aware prompts deferred to Phase 2.1.
+- **Phase 2** (DONE): AI post-processing via Ollama (local) or Groq (cloud). Universal grammar/punctuation prompt.
+- **Phase 2.1** (DONE): App-context-aware prompts — detect frontmost app via NSWorkspace, adjust AI prompt per app category
 - **Phase 3**: Meeting transcription mode (long recordings, speaker diarisation, export)
 - **Phase 4**: OSS release prep (README, CI, code signing)
 
@@ -128,7 +132,6 @@ public/
 ## Next Steps
 
 - **AI eval (before Phase 3):** Template at `docs/ai-eval.csv`. Collect 20-30 real dictation samples, run each through Off/Ollama/Groq Fast/Groq Quality, manually judge correction quality, meaning preservation, latency.
-- **Phase 2.1:** App-context-aware prompts (detect frontmost app via Accessibility API, adjust prompt for Slack vs VS Code vs Mail)
 - **Phase 3:** Meeting transcription mode
 - **Phase 4:** OSS release prep
 
