@@ -46,9 +46,9 @@ pub async fn post_process(
     let system_prompt = build_system_prompt(app_name.as_deref());
 
     if system_prompt.contains("\nContext:") {
-        log::info!("AI post-processing: detected app {:?}, using context hint", app_name.as_deref().unwrap_or("unknown"));
+        eprintln!("[iSpeak] AI post-processing: detected app {:?}, using context hint", app_name.as_deref().unwrap_or("unknown"));
     } else {
-        log::info!("AI post-processing: detected app {:?}, using default prompt", app_name.as_deref().unwrap_or("unknown"));
+        eprintln!("[iSpeak] AI post-processing: detected app {:?}, using default prompt", app_name.as_deref().unwrap_or("unknown"));
     }
 
     let result = match ai_mode {
