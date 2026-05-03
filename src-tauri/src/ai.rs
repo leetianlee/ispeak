@@ -45,6 +45,12 @@ pub async fn post_process(
     let app_name = crate::frontmost_app::get_frontmost_app_name();
     let system_prompt = build_system_prompt(app_name.as_deref());
 
+    if system_prompt.contains("\nContext:") {
+        log::info!("AI post-processing: detected app {:?}, using context hint", app_name.as_deref().unwrap_or("unknown"));
+    } else {
+        log::info!("AI post-processing: detected app {:?}, using default prompt", app_name.as_deref().unwrap_or("unknown"));
+    }
+
     let result = match ai_mode {
         AIMode::Off => return Ok(raw_text.to_string()),
         AIMode::Local => {
