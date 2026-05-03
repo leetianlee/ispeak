@@ -93,7 +93,7 @@ pub fn run() {
                 .icon(app.default_window_icon().unwrap().clone())
                 .tooltip("iSpeak")
                 .on_tray_icon_event(|tray, event| {
-                    if let tauri::tray::TrayIconEvent::Click { .. } = event {
+                    if let tauri::tray::TrayIconEvent::Click { button: tauri::tray::MouseButton::Left, button_state: tauri::tray::MouseButtonState::Up, .. } = event {
                         if let Some(window) = tray.app_handle().get_webview_window("main") {
                             if window.is_visible().unwrap_or(false) {
                                 let _ = window.hide();
