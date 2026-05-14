@@ -36,6 +36,10 @@ Requires: Node 18+, Rust (rustup), cmake (conda install -c conda-forge cmake).
 
 **Phase 2.1 (App-Context-Aware Prompts):** Implemented May 2026. Detects the frontmost macOS app via `NSWorkspace` and appends a context hint to the AI system prompt. Chat apps (Slack/Teams/Discord) get casual tone, email apps get formatting-aware corrections, code editors get minimal punctuation, terminals get command-friendly style, Claude gets LLM-prompt-aware prose. Falls back to default grammar correction for unrecognised apps.
 
+**Stability & Quality Fixes (May 14 2026):**
+- **Paste "V bug" fix** (`paste.rs`): On slower machines, the Cmd modifier hadn't latched before the V keycode fired, so the chord landed as a literal "v" character in the foreground window. Bumped focus-return delay 150ms → 300ms and added 25ms gaps around the V click. Commit `4e30bd5`.
+- **AI prompt v2** (`ai.rs`): Rewrote `BASE_PROMPT` with 7 explicit rules (grammar, ASR error correction with homophone list, disfluency removal, meaning preservation, proper-noun protection, verbatim punctuation, output-format strictness) plus 3 worked examples. Lowered Groq `temperature` to 0.1 for deterministic correction. Ollama path uses the same prompt but its request struct does not yet set a temperature (defaults to ~0.8) — known follow-up if local mode shows wandering output. Commit `fee0a98`.
+
 **UI Overhaul:** Also completed May 2026:
 - Custom app icon (lowercase "i" with mic-capsule dot on indigo gradient squircle)
 - Status-first Dictate tab with hero area, transcript card with copy button
