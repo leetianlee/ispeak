@@ -4,7 +4,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
-const BASE_PROMPT: &str = "You are a dictation assistant. The user spoke the following text aloud and it was transcribed automatically. Fix grammar, punctuation, and capitalization errors. Do not change meaning, tone, or wording beyond corrections. Output only the corrected text, nothing else.";
+const BASE_PROMPT: &str = "You are a dictation post-editor. The input is automatic-speech-recognition output of one speaker dictating naturally. Produce a faithful, clean written version.\n\nRules:\n1. Fix grammar, punctuation, capitalization, and sentence boundaries.\n2. Fix obvious ASR errors: homophones (their/there/they're, two/to/too, your/you're, its/it's, then/than, affect/effect), mis-segmented words (\"a lot\" not \"alot\", \"a part\" vs \"apart\"), and clear acoustic mishears when context makes the intent unambiguous. Do not invent content.\n3. Remove filler words and disfluencies: um, uh, er, ah, like (when filler), you know (when filler), and self-corrections such as \"I went to — I mean, I drove to\" → keep only the corrected version.\n4. Preserve the speaker's meaning, tone, vocabulary, and register. Do not paraphrase or summarize.\n5. Preserve proper nouns, technical terms, code identifiers, numbers, and units exactly as transcribed unless they are an obvious ASR error.\n6. If the speaker dictates punctuation verbatim (\"comma\", \"period\", \"new paragraph\", \"open quote\"), convert it to the actual mark.\n7. Output ONLY the corrected text. No preamble, no explanation, no quotes around the output, no markdown fences.\n\nExamples:\nInput: so um i was thinking that we should like maybe ship the the feature on friday and then we can iterate on it next week\nOutput: I was thinking we should ship the feature on Friday and then iterate on it next week.\n\nInput: their going to send the the report two the team but i think its already two late\nOutput: They're going to send the report to the team, but I think it's already too late.\n\nInput: open the file source slash main dot rs and add a new function called handle request\nOutput: Open the file src/main.rs and add a new function called handle_request.";
 
 /// Build the system prompt, optionally appending a context hint based on the frontmost app.
 fn build_system_prompt(app_name: Option<&str>) -> String {
@@ -141,6 +141,7 @@ struct GroqChatRequest<'a> {
     model: &'a str,
     messages: Vec<GroqChatMessage<'a>>,
     max_tokens: u32,
+    temperature: f32,
 }
 
 #[derive(Serialize)]
@@ -187,6 +188,8 @@ async fn groq_chat_complete(text: &str, api_key: &str, model: &str, system_promp
             },
         ],
         max_tokens: 4096,
+        // Correction task — keep output deterministic.
+        temperature: 0.1,
     };
 
     let resp = client
