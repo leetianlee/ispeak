@@ -304,3 +304,49 @@ export const onError = (
   handler: (error: AppError) => void
 ): Promise<UnlistenFn> =>
   listen<AppError>('app_error', e => handler(e.payload))
+
+// ─── Meeting transcription (Phase 3) ────────────────────────────────────────
+
+export interface MeetingSegment {
+  start: number
+  end: number
+  speaker: { kind: 'you' } | { kind: 'other' } | { kind: 'indexed'; value: number }
+  text: string
+}
+
+export interface MeetingProgress {
+  job_id: string
+  state: string
+  chunks_done: number
+  chunks_total: number
+}
+
+export interface MeetingDoneEvent {
+  job_id: string
+  transcript: MeetingTranscript
+}
+
+export interface MeetingErrorEvent {
+  job_id: string
+  reason: string
+}
+
+export type ExportFormat = 'markdown' | 'plain_text' | 'json' | 'srt' | 'vtt'
+
+export const meetingEnqueueFile = (path: string): Promise<string> =>
+  invoke('meeting_enqueue_file', { path })
+
+export const meetingCancel = (jobId: string): Promise<boolean> =>
+  invoke('meeting_cancel', { jobId })
+
+export const meetingExport = (transcriptId: string, format: ExportFormat): Promise<string> =>
+  invoke('meeting_export', { transcriptId, format })
+
+export const onMeetingProgress = (cb: (p: MeetingProgress) => void): Promise<UnlistenFn> =>
+  listen<MeetingProgress>('meeting://progress', (e) => cb(e.payload))
+
+export const onMeetingDone = (cb: (e: MeetingDoneEvent) => void): Promise<UnlistenFn> =>
+  listen<MeetingDoneEvent>('meeting://done', (e) => cb(e.payload))
+
+export const onMeetingError = (cb: (e: MeetingErrorEvent) => void): Promise<UnlistenFn> =>
+  listen<MeetingErrorEvent>('meeting://error', (e) => cb(e.payload))
