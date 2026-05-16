@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { listen } from "@tauri-apps/api/event";
 import { SettingsPanel } from "./components/SettingsPanel";
 import {
   getSettings,
@@ -8,8 +9,14 @@ import {
   onTranscriptReady,
   onModelDownloadProgress,
   onError,
+  meetingEnqueueFile,
+  onMeetingProgress,
+  onMeetingDone,
+  onMeetingError,
 } from "./lib/contract";
 import { useAppStore } from "./store/useAppStore";
+import { useMeetingStore } from "./store/useMeetingStore";
+import { ACCEPTED_EXTS } from "./components/Transcribe/DropZone";
 
 export default function App() {
   const { setRecordingState, setSettings, setMicrophones, setInstalledModels,
@@ -48,6 +55,48 @@ export default function App() {
     }).then((u) => unlisten.push(u));
 
     return () => unlisten.forEach((u) => u());
+  }, []);
+
+  // Meeting event listeners — hoisted here so they survive tab switches
+  useEffect(() => {
+    let cancelled = false
+    const handles: Array<() => void> = []
+
+    const register = async () => {
+      handles.push(await listen<{ paths: string[] }>('tauri://drag-drop', async (e) => {
+        const path = e.payload?.paths?.[0]
+        if (!path) return
+        const lower = path.toLowerCase()
+        const ext = '.' + (lower.split('.').pop() ?? '')
+        if (!ACCEPTED_EXTS.includes(ext)) {
+          useMeetingStore.getState().setLastError(`Unsupported format: ${ext}`)
+          return
+        }
+        useMeetingStore.getState().setLastError(null)
+        try { await meetingEnqueueFile(path) }
+        catch (err) { useMeetingStore.getState().setLastError(String(err)) }
+      }))
+
+      handles.push(await onMeetingProgress((p) => {
+        useMeetingStore.getState().upsertProgress(p)
+      }))
+      handles.push(await onMeetingDone((e) => {
+        useMeetingStore.getState().removeJob(e.job_id)
+        useMeetingStore.getState().addTranscript(e.transcript)
+      }))
+      handles.push(await onMeetingError((e) => {
+        useMeetingStore.getState().removeJob(e.job_id)
+        useMeetingStore.getState().setLastError(e.reason)
+      }))
+
+      if (cancelled) handles.forEach((u) => u())
+    }
+    register()
+
+    return () => {
+      cancelled = true
+      handles.forEach((u) => u())
+    }
   }, []);
 
   return (

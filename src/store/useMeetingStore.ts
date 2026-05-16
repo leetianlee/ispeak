@@ -11,14 +11,17 @@ interface JobView {
 interface MeetingStore {
   jobs: Record<string, JobView>
   transcripts: MeetingTranscript[]
+  lastError: string | null
   upsertProgress: (p: MeetingProgress) => void
   removeJob: (id: string) => void
   addTranscript: (t: MeetingTranscript) => void
+  setLastError: (msg: string | null) => void
 }
 
 export const useMeetingStore = create<MeetingStore>((set) => ({
   jobs: {},
   transcripts: [],
+  lastError: null,
   upsertProgress: (p) =>
     set((s) => ({
       jobs: {
@@ -38,4 +41,5 @@ export const useMeetingStore = create<MeetingStore>((set) => ({
       return { jobs: next }
     }),
   addTranscript: (t) => set((s) => ({ transcripts: [t, ...s.transcripts] })),
+  setLastError: (msg) => set({ lastError: msg }),
 }))
