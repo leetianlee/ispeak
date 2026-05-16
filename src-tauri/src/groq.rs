@@ -51,6 +51,57 @@ pub async fn transcribe(audio_wav: Vec<u8>, api_key: &str) -> Result<String> {
     Ok(result.text.trim().to_string())
 }
 
+#[derive(serde::Deserialize, Debug, Clone)]
+pub struct GroqSegment {
+    pub start: f32,
+    pub end: f32,
+    pub text: String,
+}
+
+#[derive(serde::Deserialize)]
+struct GroqVerboseResponse {
+    segments: Vec<GroqSegment>,
+}
+
+/// Transcribe via Groq with `response_format=verbose_json` to get segment timestamps.
+pub async fn transcribe_verbose(audio_wav: Vec<u8>, api_key: &str) -> Result<Vec<GroqSegment>> {
+    if api_key.is_empty() {
+        return Err(AppError::Groq("Groq API key is not set".into()));
+    }
+    let client = Client::new();
+    let part = reqwest::multipart::Part::bytes(audio_wav)
+        .file_name("audio.wav")
+        .mime_str("audio/wav")
+        .map_err(|e| AppError::Groq(e.to_string()))?;
+
+    let form = reqwest::multipart::Form::new()
+        .text("model", "whisper-large-v3-turbo")
+        .text("language", "en")
+        .text("response_format", "verbose_json")
+        .part("file", part);
+
+    let response = client
+        .post("https://api.groq.com/openai/v1/audio/transcriptions")
+        .header("Authorization", format!("Bearer {api_key}"))
+        .multipart(form)
+        .send()
+        .await
+        .map_err(|e| AppError::Groq(format!("Request failed: {e}")))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        return Err(AppError::Groq(format!("API error {status}: {body}")));
+    }
+
+    let result: GroqVerboseResponse = response
+        .json()
+        .await
+        .map_err(|e| AppError::Groq(format!("Failed to parse response: {e}")))?;
+
+    Ok(result.segments)
+}
+
 /// Encode f32 16kHz mono samples as a WAV file in memory.
 pub fn encode_wav(samples: &[f32], sample_rate: u32) -> Vec<u8> {
     let num_samples = samples.len() as u32;
