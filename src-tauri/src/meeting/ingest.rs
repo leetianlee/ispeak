@@ -123,4 +123,15 @@ mod tests {
         assert!(audio.channels >= 1 && audio.channels <= 2);
         assert!(audio.samples.len() > 100_000, "expected non-trivial sample count");
     }
+
+    #[test]
+    fn decodes_mp4() {
+        let path = fixture("short.mp4");
+        if !path.exists() {
+            eprintln!("skipping: {path:?} not present");
+            return;
+        }
+        let audio = decode_file(&path).expect("decode mp4 audio track");
+        assert!(audio.samples.len() > 100_000);
+    }
 }
