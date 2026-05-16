@@ -97,36 +97,6 @@ export interface ModelDownloadProgress {
   error: string | null
 }
 
-/** A stored meeting transcript with structured output. */
-export interface MeetingTranscript {
-  id: string
-  /** Original filename of the imported audio/video file. */
-  file_name: string
-  duration_ms: number
-  segments: TranscriptSegment[]
-  /** ~200-word LLM-generated summary. Empty string if AI mode was off. */
-  summary: string
-  /** Bullet-point action items extracted by LLM. Empty array if AI mode was off. */
-  action_items: string[]
-  created_at: string
-}
-
-/** A single timestamped segment within a meeting transcript. */
-export interface TranscriptSegment {
-  /** Speaker label from diarization, e.g. "Speaker 1". Null if diarization unavailable. */
-  speaker: string | null
-  start_ms: number
-  end_ms: number
-  text: string
-}
-
-/** Progress event emitted during file transcription. */
-export interface TranscribeFileProgress {
-  /** 0–100 */
-  percent: number
-  stage: 'chunking' | 'transcribing' | 'diarizing' | 'summarising'
-}
-
 /** Generic application error emitted via Tauri event. */
 export interface AppError {
   code: string
@@ -217,44 +187,6 @@ export const deleteModel = (model: WhisperModel): Promise<void> =>
   invoke('delete_model', { model })
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Meeting / Transcribe Commands (Phase 3)
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Transcribe an audio or video file.
- * Accepted: .mp4, .m4a, .mp3, .wav, .ogg
- * Progress reported via transcribe_file_progress events.
- * Result stored in SQLite history and returned.
- */
-export const transcribeFile = (filePath: string): Promise<MeetingTranscript> =>
-  invoke('transcribe_file', { filePath })
-
-/**
- * Retrieve stored meeting transcripts, newest first.
- */
-export const getMeetingHistory = (
-  limit: number = 50,
-  offset: number = 0
-): Promise<MeetingTranscript[]> =>
-  invoke('get_meeting_history', { limit, offset })
-
-/**
- * Delete a stored meeting transcript from history.
- */
-export const deleteMeetingTranscript = (id: string): Promise<void> =>
-  invoke('delete_meeting_transcript', { id })
-
-/**
- * Export a stored transcript to a formatted string.
- * 'markdown' returns a Markdown document string ready to write to file.
- */
-export const exportTranscript = (
-  id: string,
-  format: 'markdown'
-): Promise<string> =>
-  invoke('export_transcript', { id, format })
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Events — Rust → Frontend
 // All event listeners return an unlisten function. Call it on component unmount.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -288,15 +220,6 @@ export const onModelDownloadProgress = (
   listen<ModelDownloadProgress>('model_download_progress', e => handler(e.payload))
 
 /**
- * Emitted repeatedly during audio file transcription (Phase 3).
- * Use to drive a progress indicator in the meeting view.
- */
-export const onTranscribeFileProgress = (
-  handler: (progress: TranscribeFileProgress) => void
-): Promise<UnlistenFn> =>
-  listen<TranscribeFileProgress>('transcribe_file_progress', e => handler(e.payload))
-
-/**
  * Emitted when a recoverable error occurs (e.g. transcription failed, model not found).
  * Display a toast or inline error message. App returns to IDLE after emitting this.
  */
@@ -308,10 +231,24 @@ export const onError = (
 // ─── Meeting transcription (Phase 3) ────────────────────────────────────────
 
 export interface MeetingSegment {
-  start: number
-  end: number
+  start: number    // seconds
+  end: number      // seconds
   speaker: { kind: 'you' } | { kind: 'other' } | { kind: 'indexed'; value: number }
   text: string
+}
+
+/** A stored meeting transcript — matches the Rust `Transcript` struct exactly. */
+export interface MeetingTranscript {
+  id: string
+  created_at: number    // unix millis
+  duration_secs: number
+  source:
+    | { kind: 'file_import'; value: string }
+    | { kind: 'live_capture' }
+  segments: MeetingSegment[]
+  summary: string | null
+  action_items: string[]
+  partial: boolean
 }
 
 export interface MeetingProgress {
