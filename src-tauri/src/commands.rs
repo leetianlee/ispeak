@@ -405,7 +405,7 @@ pub fn update_settings<R: Runtime>(
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-pub(crate) fn load_settings<R: Runtime>(app: &AppHandle<R>) -> AppSettings {
+pub fn load_settings<R: Runtime>(app: &AppHandle<R>) -> AppSettings {
     let Ok(store) = app.store("settings.json") else {
         return AppSettings::default();
     };

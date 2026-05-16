@@ -81,6 +81,7 @@ pub fn run() {
             let app_data_dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&app_data_dir)?;
             app.manage(AppState::new(app_data_dir));
+            app.manage(crate::meeting::MeetingState::new());
 
             let settings = commands::load_settings(app.handle());
             if let Err(e) = app
@@ -120,6 +121,10 @@ pub fn run() {
             commands::delete_model,
             commands::get_settings,
             commands::update_settings,
+            crate::meeting::commands::meeting_enqueue_file,
+            crate::meeting::commands::meeting_cancel,
+            crate::meeting::commands::meeting_queue_snapshot,
+            crate::meeting::commands::meeting_export,
         ])
         .run(tauri::generate_context!())
         .expect("error while running iSpeak");
