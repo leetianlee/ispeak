@@ -17,6 +17,9 @@ pub enum AppError {
     #[error("Settings error: {0}")]
     Settings(String),
 
+    #[error("Meeting transcription error: {0}")]
+    Meeting(String),
+
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 

@@ -2,11 +2,12 @@ mod ai;
 mod audio;
 mod commands;
 mod error;
+mod frontmost_app;
 mod groq;
+mod meeting;
 mod paste;
 mod settings;
 mod whisper_engine;
-mod frontmost_app;
 
 use commands::AppState;
 use tauri::Manager;

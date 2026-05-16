@@ -50,6 +50,9 @@ chrono = { version = "0.4", features = ["serde"] }
 # Error derive macro
 thiserror = "1"
 
+# UUID for meeting job and transcript IDs
+uuid = { version = "1", features = ["v4", "serde"] }
+
 # Logging
 log = "0.4"
 env_logger = "0.11"
