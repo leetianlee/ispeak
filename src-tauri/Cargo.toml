@@ -32,6 +32,11 @@ cpal = "0.15"
 # Resampling raw audio to 16kHz for Whisper
 rubato = "0.15"
 
+# Audio decode (file import pipeline)
+symphonia = { version = "0.6", features = ["mp3", "aac", "isomp4", "wav", "ogg", "flac"] }
+mp4 = "0.14"
+tempfile = "3"
+
 # Local Whisper transcription
 whisper-rs = { version = "0.11", features = ["metal"] }
 
@@ -67,6 +72,9 @@ objc2-foundation = { version = "0.3" }
 # events without ever setting CGEventSetFlags on the keyDown, so apps that read
 # `[event modifierFlags]` see plain "v". See paste.rs for details.
 core-graphics = "0.25"
+
+[dev-dependencies]
+hound = "3"
 
 [features]
 default = ["custom-protocol"]
