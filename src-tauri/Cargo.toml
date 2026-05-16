@@ -44,9 +44,6 @@ futures-util = "0.3"
 # Clipboard access
 arboard = "3"
 
-# Keyboard simulation for paste
-enigo = "0.2"
-
 # Date/time for transcript timestamps
 chrono = { version = "0.4", features = ["serde"] }
 
@@ -57,10 +54,16 @@ thiserror = "1"
 log = "0.4"
 env_logger = "0.11"
 
-# Frontmost app detection (macOS) — objc2 already a transitive dep via tauri
+# macOS-only deps
 [target.'cfg(target_os = "macos")'.dependencies]
+# Frontmost app detection — objc2 already a transitive dep via tauri
 objc2-app-kit = { version = "0.3", features = ["NSWorkspace", "NSRunningApplication"] }
 objc2-foundation = { version = "0.3" }
+# Cmd+V keystroke for paste — direct CGEvent so we can set the COMMAND flag
+# on the event itself. enigo posts modifier+key as separate flagsChanged + keyDown
+# events without ever setting CGEventSetFlags on the keyDown, so apps that read
+# `[event modifierFlags]` see plain "v". See paste.rs for details.
+core-graphics = "0.25"
 
 [features]
 default = ["custom-protocol"]
