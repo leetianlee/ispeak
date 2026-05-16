@@ -4,7 +4,7 @@ mod commands;
 mod error;
 mod frontmost_app;
 mod groq;
-mod meeting;
+pub mod meeting;
 mod paste;
 mod settings;
 mod whisper_engine;
