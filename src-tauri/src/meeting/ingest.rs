@@ -127,6 +127,51 @@ pub fn resample(mono: &[f32], from_rate: u32, to_rate: u32) -> Result<Vec<f32>> 
     Ok(out.into_iter().next().unwrap_or_default())
 }
 
+/// Decode + downmix + resample a source file into a 16kHz mono f32 PCM file on disk.
+/// Returns the temp file path; caller is responsible for cleanup.
+pub fn ingest_to_pcm_file(src: &Path, dest_dir: &Path) -> Result<std::path::PathBuf> {
+    let decoded = decode_file(src)?;
+    let mono = to_mono(&decoded.samples, decoded.channels);
+    let resampled = resample(&mono, decoded.sample_rate, 16_000)?;
+
+    std::fs::create_dir_all(dest_dir)
+        .map_err(|e| AppError::Meeting(format!("create dest dir: {e}")))?;
+    let path = dest_dir.join(format!("{}.pcm", uuid::Uuid::new_v4()));
+    let mut file = std::fs::File::create(&path)
+        .map_err(|e| AppError::Meeting(format!("create pcm file: {e}")))?;
+    use std::io::Write;
+    let mut buf = Vec::with_capacity(resampled.len() * 4);
+    for s in &resampled {
+        buf.extend_from_slice(&s.to_le_bytes());
+    }
+    file.write_all(&buf).map_err(|e| AppError::Meeting(format!("write pcm: {e}")))?;
+    Ok(path)
+}
+
+/// Read a contiguous window of f32 samples from a PCM file (16kHz mono assumed).
+pub fn read_pcm_window(pcm_path: &Path, start_sample: usize, len_samples: usize) -> Result<Vec<f32>> {
+    use std::io::{Read, Seek, SeekFrom};
+    let mut file = std::fs::File::open(pcm_path)
+        .map_err(|e| AppError::Meeting(format!("open pcm: {e}")))?;
+    file.seek(SeekFrom::Start((start_sample * 4) as u64))
+        .map_err(|e| AppError::Meeting(format!("seek pcm: {e}")))?;
+    let mut buf = vec![0u8; len_samples * 4];
+    let n = file.read(&mut buf).map_err(|e| AppError::Meeting(format!("read pcm: {e}")))?;
+    buf.truncate(n);
+    let mut samples = Vec::with_capacity(n / 4);
+    for chunk in buf.chunks_exact(4) {
+        samples.push(f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]));
+    }
+    Ok(samples)
+}
+
+/// Total sample count of a PCM file (assumes 32-bit f32-LE).
+pub fn pcm_file_samples(pcm_path: &Path) -> Result<usize> {
+    let meta = std::fs::metadata(pcm_path)
+        .map_err(|e| AppError::Meeting(format!("stat pcm: {e}")))?;
+    Ok(meta.len() as usize / 4)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -189,5 +234,20 @@ mod tests {
         let expected = 16_000_f32;
         let diff = (out.len() as f32 - expected).abs();
         assert!(diff < expected * 0.01, "got {} expected ~{}", out.len(), expected);
+    }
+
+    #[test]
+    fn ingest_wav_produces_pcm_file_at_16k() {
+        let src = fixture("30s-two-tones.wav");
+        let dest_dir = tempfile::tempdir().unwrap();
+        let pcm = ingest_to_pcm_file(&src, dest_dir.path()).expect("ingest");
+        let n = pcm_file_samples(&pcm).expect("count");
+        // 30s * 16000 = 480_000 samples (±1%)
+        let expected = 480_000_i64;
+        let diff = (n as i64 - expected).abs();
+        assert!(diff < expected / 100, "got {} samples, expected ~{}", n, expected);
+        // Read a 1s window starting at 5s
+        let window = read_pcm_window(&pcm, 5 * 16_000, 16_000).expect("window");
+        assert_eq!(window.len(), 16_000);
     }
 }
