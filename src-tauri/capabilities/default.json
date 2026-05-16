@@ -9,6 +9,9 @@
     "store:allow-save",
     "store:allow-load",
     "dialog:allow-message",
-    "shell:allow-open"
+    "dialog:allow-save",
+    "shell:allow-open",
+    "clipboard-manager:allow-write-text",
+    "fs:allow-write-text-file"
   ]
 }
