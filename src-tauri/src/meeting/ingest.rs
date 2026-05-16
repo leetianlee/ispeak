@@ -110,4 +110,17 @@ mod tests {
         let diff = (audio.samples.len() as i64 - 2_646_000_i64).abs();
         assert!(diff < 5_000, "got {} samples", audio.samples.len());
     }
+
+    #[test]
+    fn decodes_m4a() {
+        let path = fixture("short.m4a");
+        if !path.exists() {
+            eprintln!("skipping: {path:?} not present");
+            return;
+        }
+        let audio = decode_file(&path).expect("decode m4a");
+        assert!(audio.sample_rate == 44_100 || audio.sample_rate == 48_000);
+        assert!(audio.channels >= 1 && audio.channels <= 2);
+        assert!(audio.samples.len() > 100_000, "expected non-trivial sample count");
+    }
 }
