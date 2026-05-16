@@ -58,7 +58,7 @@ pub struct Segment {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case", tag = "kind", content = "path")]
+#[serde(rename_all = "snake_case", tag = "kind", content = "value")]
 pub enum TranscriptSource {
     FileImport(PathBuf),
     LiveCapture,

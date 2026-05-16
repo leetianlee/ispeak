@@ -9,3 +9,8 @@ pub mod jobs;
 pub mod pipeline;
 pub mod stitch;
 pub mod types;
+
+pub use types::{
+    ExportFormat, Job, JobMode, JobState, Progress, Segment, SpeakerLabel,
+    Transcript, TranscriptSource,
+};
