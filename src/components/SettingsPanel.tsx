@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { updateSettings } from "../lib/contract";
 import { useAppStore } from "../store/useAppStore";
 import { ModelDownload } from "./ModelDownload";
+import { Transcribe } from "./Transcribe";
 
 const TAB_ICONS: Record<string, React.ReactNode> = {
   dictate: (
@@ -24,12 +25,22 @@ const TAB_ICONS: Record<string, React.ReactNode> = {
       <path d="M18 14l.7 2.1L21 17l-2.3.9L18 20l-.7-2.1L15 17l2.3-.9Z" />
     </svg>
   ),
+  transcribe: (
+    <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
+      <polyline points="14 2 14 8 20 8" />
+      <line x1="16" x2="8" y1="13" y2="13" />
+      <line x1="16" x2="8" y1="17" y2="17" />
+      <line x1="10" x2="8" y1="9" y2="9" />
+    </svg>
+  ),
 };
 
 const TABS = [
-  { id: "dictate", label: "Dictate" },
-  { id: "models",  label: "Models" },
-  { id: "ai",      label: "AI" },
+  { id: "dictate",    label: "Dictate" },
+  { id: "transcribe", label: "Transcribe" },
+  { id: "models",     label: "Models" },
+  { id: "ai",         label: "AI" },
 ] as const;
 
 export function SettingsPanel() {
@@ -179,6 +190,8 @@ export function SettingsPanel() {
             </div>
           </>
         )}
+
+        {activeTab === "transcribe" && <Transcribe />}
 
         {activeTab === "models" && <ModelDownload />}
 

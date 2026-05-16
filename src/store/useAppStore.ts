@@ -29,8 +29,8 @@ interface AppStore {
   setLastTranscript: (text: string) => void;
 
   // Active view in settings
-  activeTab: "dictate" | "models" | "ai" | "about";
-  setActiveTab: (tab: "dictate" | "models" | "ai" | "about") => void;
+  activeTab: "dictate" | "transcribe" | "models" | "ai" | "about";
+  setActiveTab: (tab: "dictate" | "transcribe" | "models" | "ai" | "about") => void;
 }
 
 export const useAppStore = create<AppStore>((set) => ({
