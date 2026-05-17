@@ -24,7 +24,7 @@ Requires: Node 18+, Rust (rustup), cmake (conda install -c conda-forge cmake).
 
 ---
 
-## Current Status: Phase 1 + Phase 2 + Phase 2.1 COMPLETE on macOS 26
+## Current Status: Phases 1, 2, 2.1, 3.1, 3.3 (MVP), 3.4, 3.5 COMPLETE on macOS 26
 
 **Phase 1 (Dictation Core):** App launches, global hotkey works (both push-to-talk and toggle modes), audio capture → transcription → clipboard → paste all functional.
 
@@ -123,7 +123,11 @@ public/
 - **Phase 1** (DONE): Core dictation — hotkey, record, local/Groq transcription, paste
 - **Phase 2** (DONE): AI post-processing via Ollama (local) or Groq (cloud). Universal grammar/punctuation prompt.
 - **Phase 2.1** (DONE): App-context-aware prompts — detect frontmost app via NSWorkspace, adjust AI prompt per app category
-- **Phase 3**: Meeting transcription mode (long recordings, speaker diarisation, export)
+- **Phase 3.1** (DONE): File-import meeting transcription — drag-drop, chunked Whisper, stitch, MD/plain export
+- **Phase 3.2** (DEFERRED): Live capture — see `docs/phase-3.2-live-capture-design.md`; needs a macOS system-audio strategy decision
+- **Phase 3.3** (MVP — manual relabel; auto-diarisation deferred): Speaker labels are click-to-cycle in the transcript view; updates persist to history
+- **Phase 3.4** (DONE): Meeting summarisation + action item extraction via the same AI providers used for dictation post-processing
+- **Phase 3.5** (DONE): SQLite-backed history with FTS5 search across summary, action items, segment text
 - **Phase 4**: OSS release prep (README, CI, code signing)
 
 ## Design Context
@@ -135,9 +139,11 @@ public/
 
 ## Next Steps
 
-- **AI eval (before Phase 3):** Template at `docs/ai-eval.csv`. Collect 20-30 real dictation samples, run each through Off/Ollama/Groq Fast/Groq Quality, manually judge correction quality, meaning preservation, latency.
-- **Phase 3:** Meeting transcription mode
-- **Phase 4:** OSS release prep
+- **AI eval (gate moved post-3.5):** Template at `docs/ai-eval.csv` is still empty. Collect 20–30 real dictation samples + ~10 meeting recordings, run each through Off/Ollama/Groq Fast/Groq Quality, manually judge correction quality, meaning preservation, latency. Now that meeting summaries exist, also rate summary faithfulness and action-item recall.
+- **Phase 3.2 decision:** Pick a system-audio capture strategy (ScreenCaptureKit vs BlackHole vs mic-only). Tradeoffs in `docs/phase-3.2-live-capture-design.md`.
+- **Phase 3.3 follow-up:** Decide if auto-diarisation is worth the Python-runtime / HF-model footprint. Manual relabel is shipping today.
+- **Manual smoke test:** Run `docs/phase-3.1-manual-test.md` end-to-end with real Whisper to verify the 3.1+3.4+3.5 chain (file import → summary → persisted to history → searchable).
+- **Phase 4:** OSS release prep — sub-phases: 4.1 CI + arm64/x86_64 binaries, 4.2 code signing + notarisation, 4.3 Windows port, 4.4 auto-update, 4.5 README/BYOK guide.
 
 ## Repository
 
