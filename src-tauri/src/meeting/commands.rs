@@ -12,6 +12,7 @@ use crate::meeting::export::render;
 use crate::meeting::history::History;
 use crate::meeting::ingest::ingest_to_pcm_file;
 use crate::meeting::jobs::{JobQueue, QueueSnapshot};
+use crate::meeting::live::{LiveRecorder, LiveSource};
 use crate::meeting::pipeline::{run, Engine, ProgressSink};
 use crate::meeting::types::{
     ExportFormat, JobMode, JobState, Progress, Segment, SpeakerLabel, Transcript, TranscriptSource,
@@ -24,6 +25,9 @@ pub struct MeetingState {
     /// Persistent history. Lazily opened on first use against the app data dir.
     /// On open failure, this remains None and Phase 3.5 features no-op gracefully.
     history: std::sync::Mutex<Option<Arc<History>>>,
+    /// Phase 3.2: in-flight live recordings keyed by their job_id. Each entry
+    /// holds open capture threads + writers; removed on `meeting_stop_live`.
+    live_recorders: std::sync::Mutex<std::collections::HashMap<Uuid, LiveRecorder>>,
 }
 
 impl MeetingState {
@@ -32,6 +36,7 @@ impl MeetingState {
             queue: Arc::new(JobQueue::new()),
             last_results: Arc::new(std::sync::Mutex::new(Vec::new())),
             history: std::sync::Mutex::new(None),
+            live_recorders: std::sync::Mutex::new(std::collections::HashMap::new()),
         }
     }
 
@@ -324,6 +329,164 @@ pub fn meeting_delete_history<R: Runtime>(
         return Ok(false);
     };
     h.delete(id)
+}
+
+// ─── Phase 3.2: live capture ───────────────────────────────────────────────
+
+#[tauri::command]
+pub fn meeting_start_live<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, MeetingState>,
+    source: LiveSource,
+) -> Result<Uuid> {
+    let settings = crate::commands::load_settings(&app);
+    let mic_device_id = settings.microphone_id.clone();
+    let job_id = Uuid::new_v4();
+    let work_dir = std::env::temp_dir().join(format!("iSpeak-live-{job_id}"));
+
+    let recorder = LiveRecorder::start(job_id, source, mic_device_id, work_dir.clone())?;
+
+    state
+        .live_recorders
+        .lock()
+        .unwrap()
+        .insert(job_id, recorder);
+
+    let _ = app.emit(
+        "meeting://progress",
+        ProgressEvent {
+            job_id,
+            state: "recording".into(),
+            chunks_done: 0,
+            chunks_total: 0,
+        },
+    );
+
+    Ok(job_id)
+}
+
+#[tauri::command]
+pub async fn meeting_stop_live<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, MeetingState>,
+    job_id: Uuid,
+) -> Result<()> {
+    let recorder = state
+        .live_recorders
+        .lock()
+        .unwrap()
+        .remove(&job_id)
+        .ok_or_else(|| AppError::Meeting(format!("no live recording with id {job_id}")))?;
+
+    let pcm_path = match tokio::task::spawn_blocking(move || recorder.stop_and_finalise()).await {
+        Ok(Ok(p)) => p,
+        Ok(Err(e)) => {
+            let _ = app.emit(
+                "meeting://error",
+                ErrorEvent {
+                    job_id,
+                    reason: e.to_string(),
+                },
+            );
+            return Err(e);
+        }
+        Err(e) => {
+            let msg = format!("live finalise join error: {e}");
+            let _ = app.emit(
+                "meeting://error",
+                ErrorEvent {
+                    job_id,
+                    reason: msg.clone(),
+                },
+            );
+            return Err(AppError::Meeting(msg));
+        }
+    };
+
+    let results = state.last_results.clone();
+    let history = state.history_or_init(&app);
+    let app_clone = app.clone();
+    tokio::spawn(async move {
+        process_live_pcm(app_clone, job_id, pcm_path, results, history).await;
+    });
+    Ok(())
+}
+
+/// Drive the transcription pipeline for a finalised live-capture PCM file.
+/// Mirrors the post-ingest body of `drive_worker` but stays out of the JobQueue
+/// (live captures are tracked separately).
+async fn process_live_pcm<R: Runtime>(
+    app: AppHandle<R>,
+    job_id: Uuid,
+    pcm_path: std::path::PathBuf,
+    results: Arc<std::sync::Mutex<Vec<Transcript>>>,
+    history: Option<Arc<History>>,
+) {
+    let settings = crate::commands::load_settings(&app);
+    let engine = select_engine(&settings, &app);
+
+    struct LiveProgress<R: Runtime> {
+        app: AppHandle<R>,
+        job_id: Uuid,
+    }
+    impl<R: Runtime> ProgressSink for LiveProgress<R> {
+        fn on_chunk_done(&self, chunks_done: u32, chunks_total: u32) {
+            let _ = self.app.emit(
+                "meeting://progress",
+                ProgressEvent {
+                    job_id: self.job_id,
+                    state: "transcribing".into(),
+                    chunks_done,
+                    chunks_total,
+                },
+            );
+        }
+    }
+    let sink: Arc<dyn ProgressSink> = Arc::new(LiveProgress {
+        app: app.clone(),
+        job_id,
+    });
+    let cancel = Arc::new(std::sync::atomic::AtomicBool::new(false));
+
+    let source = TranscriptSource::LiveCapture;
+    let transcript_result = run(&pcm_path, source, engine, cancel, sink).await;
+
+    // Clean up the live work dir (parent of pcm_path).
+    if let Some(parent) = pcm_path.parent() {
+        LiveRecorder::cleanup(parent);
+    }
+
+    match transcript_result {
+        Ok(mut transcript) => {
+            let _ = app.emit(
+                "meeting://progress",
+                ProgressEvent {
+                    job_id,
+                    state: "summarising".into(),
+                    chunks_done: transcript.segments.len() as u32,
+                    chunks_total: transcript.segments.len() as u32,
+                },
+            );
+            summarise_into(&mut transcript, &settings).await;
+
+            if let Some(h) = &history {
+                if let Err(e) = h.persist(&transcript) {
+                    eprintln!("[iSpeak] persist live meeting failed: {e}");
+                }
+            }
+            results.lock().unwrap().push(transcript.clone());
+            let _ = app.emit("meeting://done", DoneEvent { job_id, transcript });
+        }
+        Err(e) => {
+            let _ = app.emit(
+                "meeting://error",
+                ErrorEvent {
+                    job_id,
+                    reason: e.to_string(),
+                },
+            );
+        }
+    }
 }
 
 // ─── Phase 3.3: manual speaker relabel ─────────────────────────────────────

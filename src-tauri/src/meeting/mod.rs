@@ -7,6 +7,9 @@ pub mod export;
 pub mod history;
 pub mod ingest;
 pub mod jobs;
+pub mod live;
+#[cfg(target_os = "macos")]
+pub mod live_macos;
 pub mod pipeline;
 pub mod stitch;
 pub mod types;

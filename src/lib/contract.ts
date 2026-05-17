@@ -309,6 +309,16 @@ export const meetingGetHistory = (id: string): Promise<MeetingTranscript | null>
 export const meetingDeleteHistory = (id: string): Promise<boolean> =>
   invoke('meeting_delete_history', { id })
 
+// ─── Phase 3.2: live capture ───────────────────────────────────────────────
+
+export type LiveSource = 'mic_only' | 'system_only' | 'mic_and_system'
+
+export const meetingStartLive = (source: LiveSource): Promise<string> =>
+  invoke('meeting_start_live', { source })
+
+export const meetingStopLive = (jobId: string): Promise<void> =>
+  invoke('meeting_stop_live', { jobId })
+
 // ─── Phase 3.3: manual speaker relabel ─────────────────────────────────────
 
 export const meetingSetSegmentSpeaker = (

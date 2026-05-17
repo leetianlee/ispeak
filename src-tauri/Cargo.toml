@@ -72,6 +72,14 @@ rusqlite = { version = "0.32", features = ["bundled"] }
 # Frontmost app detection — objc2 already a transitive dep via tauri
 objc2-app-kit = { version = "0.3", features = ["NSWorkspace", "NSRunningApplication"] }
 objc2-foundation = { version = "0.3" }
+# Phase 3.2b: system audio capture via ScreenCaptureKit.
+# objc2-screen-capture-kit — pure Rust objc2 bindings, no Swift bridge so
+# it doesn't conflict with the macOS 26 patched objc2 fork below.
+objc2-screen-capture-kit = "0.3"
+objc2-core-media = "0.3"
+objc2-core-audio-types = "0.3"
+block2 = "0.6"
+dispatch2 = "0.3"
 # Cmd+V keystroke for paste — direct CGEvent so we can set the COMMAND flag
 # on the event itself. enigo posts modifier+key as separate flagsChanged + keyDown
 # events without ever setting CGEventSetFlags on the keyDown, so apps that read

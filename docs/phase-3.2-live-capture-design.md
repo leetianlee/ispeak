@@ -1,6 +1,12 @@
 # Phase 3.2 — Live Meeting Capture (design)
 
-Status: **deferred — needs a decision on macOS system-audio capture strategy.**
+Status:
+- **3.2a (mic-only): SHIPPED** — see `src-tauri/src/meeting/live.rs` and
+  `src/components/Transcribe/LiveCapture.tsx`.
+- **3.2b (ScreenCaptureKit system audio): SCAFFOLDED, NOT WIRED** — deps installed,
+  stub at `src-tauri/src/meeting/live_macos.rs` with concrete handoff plan. Needs
+  a foreground session to complete (Screen Recording TCC prompt + audio fidelity
+  verification cannot be done in a background coding session).
 
 ## Goal
 

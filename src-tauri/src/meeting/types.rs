@@ -16,6 +16,7 @@ pub enum JobMode {
 pub enum JobState {
     Created,
     Queued,
+    Recording,
     Transcribing,
     Diarizing,
     Summarizing,
