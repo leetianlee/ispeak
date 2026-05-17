@@ -24,7 +24,7 @@ Requires: Node 18+, Rust (rustup), cmake (conda install -c conda-forge cmake).
 
 ---
 
-## Current Status: Phases 1, 2, 2.1, 3.1, 3.3 (MVP), 3.4, 3.5 COMPLETE on macOS 26
+## Current Status: Phase 3 COMPLETE — Phases 1, 2, 2.1, 3.1, 3.2a, 3.2b, 3.3 (MVP), 3.4, 3.5 all working on macOS 26
 
 **Phase 1 (Dictation Core):** App launches, global hotkey works (both push-to-talk and toggle modes), audio capture → transcription → clipboard → paste all functional.
 
@@ -125,7 +125,7 @@ public/
 - **Phase 2.1** (DONE): App-context-aware prompts — detect frontmost app via NSWorkspace, adjust AI prompt per app category
 - **Phase 3.1** (DONE): File-import meeting transcription — drag-drop, chunked Whisper, stitch, MD/plain export
 - **Phase 3.2a** (DONE): Mic-only live capture via cpal streaming → finalise → existing transcription pipeline. UI in Transcribe tab.
-- **Phase 3.2b** (SCAFFOLDED): System audio via ScreenCaptureKit. Deps wired (`objc2-screen-capture-kit`, `objc2-core-media`, `block2`, `dispatch2`). Stub in `src-tauri/src/meeting/live_macos.rs` with concrete handoff plan. Needs foreground session for TCC permission + audio fidelity verification.
+- **Phase 3.2b** (DONE): System audio via ScreenCaptureKit. SCStream + custom SCStreamOutput delegate write f32 PCM directly to disk; mixed with mic at finalisation. Verified end-to-end with real audio on macOS 26.
 - **Phase 3.3** (MVP — manual relabel; auto-diarisation deferred): Speaker labels are click-to-cycle in the transcript view; updates persist to history
 - **Phase 3.4** (DONE): Meeting summarisation + action item extraction via the same AI providers used for dictation post-processing
 - **Phase 3.5** (DONE): SQLite-backed history with FTS5 search across summary, action items, segment text
