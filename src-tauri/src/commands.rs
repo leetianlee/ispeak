@@ -432,5 +432,7 @@ pub fn load_settings<R: Runtime>(app: &AppHandle<R>) -> AppSettings {
         indicator_position: get!("indicator_position", Default::default()),
         max_recording_duration_s: get!("max_recording_duration_s", 60),
         dark_mode: get!("dark_mode", true),
+        auto_diarise: get!("auto_diarise", true),
+        diarise_expected_speakers: get!("diarise_expected_speakers", 2u8),
     }
 }

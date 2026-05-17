@@ -67,6 +67,10 @@ env_logger = "0.11"
 # Phase 3.5 — meeting history persistence. Bundled to avoid OS sqlite version drift.
 rusqlite = { version = "0.32", features = ["bundled"] }
 
+# Phase 3.3b — diarisation feature extraction (spectral centroid via FFT).
+# Already a transitive dep via rubato; declared directly here for clarity.
+realfft = "3"
+
 # macOS-only deps
 [target.'cfg(target_os = "macos")'.dependencies]
 # Frontmost app detection — objc2 already a transitive dep via tauri

@@ -244,6 +244,40 @@ export function SettingsPanel() {
                 />
               </Section>
             )}
+
+            <Section title="Speaker Diarisation">
+              <p className="text-xs text-slate-500 mb-3">
+                Heuristic clustering by voice features. Applied to meetings only (not dictation).
+              </p>
+              <InlineField label="Auto-detect speakers">
+                <label className="inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="sr-only peer"
+                    checked={settings.auto_diarise}
+                    onChange={(e) => save({ auto_diarise: e.target.checked })}
+                  />
+                  <div className="w-9 h-5 bg-[#1e2535] rounded-full peer peer-checked:bg-indigo-600 transition-colors relative">
+                    <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-slate-200 rounded-full transition-transform peer-checked:translate-x-4" />
+                  </div>
+                </label>
+              </InlineField>
+              {settings.auto_diarise && (
+                <InlineField label="Expected speakers">
+                  <input
+                    type="number"
+                    min={1}
+                    max={8}
+                    className="w-16 bg-[#0f1117] border border-[#2a3347] rounded-md px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+                    value={settings.diarise_expected_speakers}
+                    onChange={(e) => {
+                      const n = Math.max(1, Math.min(8, parseInt(e.target.value) || 2))
+                      save({ diarise_expected_speakers: n })
+                    }}
+                  />
+                </InlineField>
+              )}
+            </Section>
           </>
         )}
 

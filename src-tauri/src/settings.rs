@@ -128,6 +128,21 @@ pub struct AppSettings {
 
     #[serde(default = "default_true")]
     pub dark_mode: bool,
+
+    /// Phase 3.3b — automatic speaker diarisation. When true, every meeting
+    /// transcript gets per-segment speaker labels assigned via the heuristic
+    /// in `meeting::diarise`. Disable to keep every segment labelled "Speaker".
+    #[serde(default = "default_true")]
+    pub auto_diarise: bool,
+
+    /// Expected number of distinct speakers in a meeting. K-means uses this as
+    /// k. 2 is the sweet spot for 1-on-1s; bump for multi-party calls.
+    #[serde(default = "default_diarise_speakers")]
+    pub diarise_expected_speakers: u8,
+}
+
+fn default_diarise_speakers() -> u8 {
+    2
 }
 
 fn default_hotkey() -> String {
@@ -165,6 +180,8 @@ impl Default for AppSettings {
             indicator_position: IndicatorPosition::default(),
             max_recording_duration_s: default_max_duration(),
             dark_mode: true,
+            auto_diarise: true,
+            diarise_expected_speakers: default_diarise_speakers(),
         }
     }
 }

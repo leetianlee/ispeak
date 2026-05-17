@@ -7,6 +7,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use crate::error::{AppError, Result};
 use crate::groq;
 use crate::meeting::chunker::{plan_chunks, ChunkBounds};
+use crate::meeting::diarise::{diarise, DiariseConfig};
 use crate::meeting::ingest::{pcm_file_samples, read_pcm_window};
 use crate::meeting::stitch::{stitch, ChunkResult, RawSegment};
 use crate::meeting::types::{Transcript, TranscriptSource};
@@ -29,6 +30,13 @@ impl ProgressSink for NoopProgress {
     fn on_chunk_done(&self, _: u32, _: u32) {}
 }
 
+/// Diarisation knobs passed in from settings. `None` skips diarisation entirely
+/// (every segment stays labelled as the original SpeakerLabel::Other).
+#[derive(Debug, Clone, Copy)]
+pub struct DiariseOpts {
+    pub k: u8,
+}
+
 /// Run the file-import pipeline. Returns a complete or partial Transcript.
 pub async fn run(
     pcm_path: &Path,
@@ -36,6 +44,7 @@ pub async fn run(
     engine: Engine,
     cancel: Arc<AtomicBool>,
     progress: Arc<dyn ProgressSink>,
+    diarise_opts: Option<DiariseOpts>,
 ) -> Result<Transcript> {
     let total_samples = pcm_file_samples(pcm_path)?;
     let chunks = plan_chunks(total_samples);
@@ -67,8 +76,25 @@ pub async fn run(
         progress.on_chunk_done(chunk_results.len() as u32, chunks_total);
     }
 
-    let segments = stitch(&chunk_results);
+    let mut segments = stitch(&chunk_results);
     let duration_secs = total_samples as f32 / 16_000.0;
+
+    // Phase 3.3b: heuristic diarisation. Reads the full PCM into memory, extracts
+    // per-turn features, clusters with k-means, and re-labels segments. Non-fatal —
+    // any error logs and leaves segments untouched.
+    if let Some(opts) = diarise_opts {
+        if !partial || !segments.is_empty() {
+            match read_pcm_window(pcm_path, 0, total_samples) {
+                Ok(samples) => {
+                    let cfg = DiariseConfig::for_16k(opts.k);
+                    segments = diarise(&samples, segments, cfg);
+                }
+                Err(e) => {
+                    eprintln!("[iSpeak] diarisation skipped — read pcm failed: {e}");
+                }
+            }
+        }
+    }
 
     Ok(Transcript {
         id: uuid::Uuid::new_v4(),

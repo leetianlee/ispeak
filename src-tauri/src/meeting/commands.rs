@@ -13,7 +13,7 @@ use crate::meeting::history::History;
 use crate::meeting::ingest::ingest_to_pcm_file;
 use crate::meeting::jobs::{JobQueue, QueueSnapshot};
 use crate::meeting::live::{LiveRecorder, LiveSource};
-use crate::meeting::pipeline::{run, Engine, ProgressSink};
+use crate::meeting::pipeline::{run, DiariseOpts, Engine, ProgressSink};
 use crate::meeting::types::{
     ExportFormat, JobMode, JobState, Progress, Segment, SpeakerLabel, Transcript, TranscriptSource,
 };
@@ -162,7 +162,8 @@ async fn drive_worker<R: Runtime>(
             queue: queue.clone(),
         });
         let source = TranscriptSource::FileImport(path.clone());
-        let transcript_result = run(&pcm_path, source, engine, cancel.clone(), sink).await;
+        let diarise = diarise_opts_from(&settings);
+        let transcript_result = run(&pcm_path, source, engine, cancel.clone(), sink, diarise).await;
 
         let _ = std::fs::remove_dir_all(&cache_dir);
 
@@ -236,6 +237,15 @@ fn render_segments_plain(segments: &[Segment]) -> String {
         out.push_str(&format!("{}: {}\n", speaker, seg.text));
     }
     out
+}
+
+fn diarise_opts_from(settings: &crate::settings::AppSettings) -> Option<DiariseOpts> {
+    if !settings.auto_diarise {
+        return None;
+    }
+    Some(DiariseOpts {
+        k: settings.diarise_expected_speakers.max(1),
+    })
 }
 
 fn select_engine<R: Runtime>(settings: &crate::settings::AppSettings, app: &AppHandle<R>) -> Engine {
@@ -449,7 +459,8 @@ async fn process_live_pcm<R: Runtime>(
     let cancel = Arc::new(std::sync::atomic::AtomicBool::new(false));
 
     let source = TranscriptSource::LiveCapture;
-    let transcript_result = run(&pcm_path, source, engine, cancel, sink).await;
+    let diarise = diarise_opts_from(&settings);
+    let transcript_result = run(&pcm_path, source, engine, cancel, sink, diarise).await;
 
     // Clean up the live work dir (parent of pcm_path).
     if let Some(parent) = pcm_path.parent() {

@@ -3,6 +3,7 @@
 
 pub mod chunker;
 pub mod commands;
+pub mod diarise;
 pub mod export;
 pub mod history;
 pub mod ingest;

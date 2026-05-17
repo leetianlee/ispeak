@@ -77,6 +77,10 @@ export interface AppSettings {
   max_recording_duration_s: number
   /** Whether dark mode is forced (true) or follows system preference (false). */
   dark_mode: boolean
+  /** Phase 3.3b: run heuristic speaker diarisation on meeting transcripts. */
+  auto_diarise: boolean
+  /** Expected number of distinct speakers (k for k-means). Default 2. */
+  diarise_expected_speakers: number
 }
 
 /** A microphone device available on the system. */

@@ -126,7 +126,8 @@ public/
 - **Phase 3.1** (DONE): File-import meeting transcription — drag-drop, chunked Whisper, stitch, MD/plain export
 - **Phase 3.2a** (DONE): Mic-only live capture via cpal streaming → finalise → existing transcription pipeline. UI in Transcribe tab.
 - **Phase 3.2b** (DONE): System audio via ScreenCaptureKit. SCStream + custom SCStreamOutput delegate write f32 PCM directly to disk; mixed with mic at finalisation. Verified end-to-end with real audio on macOS 26.
-- **Phase 3.3** (MVP — manual relabel; auto-diarisation deferred): Speaker labels are click-to-cycle in the transcript view; updates persist to history
+- **Phase 3.3** (DONE — manual relabel): Speaker labels click-to-cycle in the transcript view; updates persist to history
+- **Phase 3.3b** (DONE — heuristic auto-diarisation): Silence-bounded turn detection + per-turn features (mean RMS, ZCR, spectral centroid via realfft) + k-means clustering. Pure Rust, no models. Toggle and speaker count in Settings → Speaker Diarisation.
 - **Phase 3.4** (DONE): Meeting summarisation + action item extraction via the same AI providers used for dictation post-processing
 - **Phase 3.5** (DONE): SQLite-backed history with FTS5 search across summary, action items, segment text
 - **Phase 4**: OSS release prep (README, CI, code signing)
