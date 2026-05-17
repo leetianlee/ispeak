@@ -20,6 +20,7 @@ interface MeetingStore {
     segmentIndex: number,
     speaker: MeetingSegment['speaker'],
   ) => void
+  updateSpeakerNames: (transcriptId: string, names: Record<string, string>) => void
   setLastError: (msg: string | null) => void
 }
 
@@ -55,6 +56,12 @@ export const useMeetingStore = create<MeetingStore>((set) => ({
         )
         return { ...t, segments }
       }),
+    })),
+  updateSpeakerNames: (transcriptId, names) =>
+    set((s) => ({
+      transcripts: s.transcripts.map((t) =>
+        t.id === transcriptId ? { ...t, speaker_names: names } : t,
+      ),
     })),
   setLastError: (msg) => set({ lastError: msg }),
 }))

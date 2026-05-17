@@ -106,6 +106,7 @@ pub async fn run(
         action_items: vec![],
         partial,
         title: None,
+        speaker_names: std::collections::HashMap::new(),
     })
 }
 

@@ -6,8 +6,10 @@ import {
   meetingResummarise,
   meetingSetTitle,
   onMeetingDone,
+  speakerDisplayName,
   MeetingTranscript,
 } from '../../lib/contract'
+import { SpeakerNamesPanel } from './SpeakerNamesPanel'
 import { writeText } from '@tauri-apps/plugin-clipboard-manager'
 import { save } from '@tauri-apps/plugin-dialog'
 import { writeTextFile } from '@tauri-apps/plugin-fs'
@@ -248,6 +250,16 @@ export function MeetingHistory() {
               </div>
               {isOpen && (
                 <div className="p-3 border-t border-slate-800/60">
+                  <SpeakerNamesPanel
+                    transcript={t}
+                    onChange={(names) =>
+                      setItems((prev) =>
+                        prev.map((x) =>
+                          x.id === t.id ? { ...x, speaker_names: names } : x,
+                        ),
+                      )
+                    }
+                  />
                   <div className="mb-3 flex items-center gap-2">
                     <div className="text-xs uppercase tracking-wider text-slate-500">
                       Summary
@@ -287,12 +299,7 @@ export function MeetingHistory() {
                     {t.segments.map((seg, i) => (
                       <div key={i}>
                         <span className="text-slate-500">
-                          {seg.speaker.kind === 'you'
-                            ? 'You'
-                            : seg.speaker.kind === 'indexed'
-                            ? `Speaker ${String.fromCharCode(65 + seg.speaker.value)}`
-                            : 'Speaker'}
-                          :
+                          {speakerDisplayName(seg.speaker, t.speaker_names)}:
                         </span>{' '}
                         {seg.text}
                       </div>

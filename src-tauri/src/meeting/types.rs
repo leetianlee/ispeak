@@ -1,6 +1,7 @@
 //! Shared types for the meeting transcription module.
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::PathBuf;
 use uuid::Uuid;
 
@@ -42,12 +43,24 @@ pub struct Job {
     pub progress: Progress,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case", tag = "kind", content = "value")]
 pub enum SpeakerLabel {
     You,
     Other,
     Indexed(u8),
+}
+
+impl SpeakerLabel {
+    /// Canonical string key for use as a map key (e.g. in `speaker_names`).
+    /// Matches the convention the frontend uses: "you", "other", "indexed:N".
+    pub fn key(&self) -> String {
+        match self {
+            SpeakerLabel::You => "you".to_string(),
+            SpeakerLabel::Other => "other".to_string(),
+            SpeakerLabel::Indexed(n) => format!("indexed:{n}"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -80,6 +93,13 @@ pub struct Transcript {
     /// User can rename via `meeting_set_title`.
     #[serde(default)]
     pub title: Option<String>,
+
+    /// Polish #3: per-transcript custom names for speaker labels.
+    /// Key is the canonical SpeakerLabel string ("you", "other", "indexed:0", …).
+    /// When a key is present, the UI and Markdown export use the value as the
+    /// display name instead of the default ("Speaker", "Speaker A", …).
+    #[serde(default)]
+    pub speaker_names: HashMap<String, String>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]

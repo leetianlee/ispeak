@@ -1,25 +1,22 @@
+import { useState } from 'react'
 import { useMeetingStore } from '../../store/useMeetingStore'
 import {
   meetingExport,
   meetingSetSegmentSpeaker,
   nextSpeakerLabel,
+  speakerDisplayName,
   MeetingTranscript,
 } from '../../lib/contract'
 import { writeText } from '@tauri-apps/plugin-clipboard-manager'
 import { save } from '@tauri-apps/plugin-dialog'
 import { writeTextFile } from '@tauri-apps/plugin-fs'
-
-function speakerLabel(s: MeetingTranscript['segments'][number]['speaker']): string {
-  switch (s.kind) {
-    case 'you': return 'You'
-    case 'other': return 'Speaker'
-    case 'indexed': return `Speaker ${String.fromCharCode(65 + s.value)}`
-  }
-}
+import { SpeakerNamesPanel } from './SpeakerNamesPanel'
 
 export function TranscriptViewer() {
   const transcripts = useMeetingStore((s) => s.transcripts)
   const updateSegmentSpeaker = useMeetingStore((s) => s.updateSegmentSpeaker)
+  const updateSpeakerNames = useMeetingStore((s) => s.updateSpeakerNames)
+  const [namingId, setNamingId] = useState<string | null>(null)
   if (transcripts.length === 0) return null
 
   const copyMd = async (id: string) => {
@@ -65,6 +62,13 @@ export function TranscriptViewer() {
             {t.partial && <span className="text-xs text-amber-400">Partial</span>}
             <div className="flex-1" />
             <button
+              onClick={() => setNamingId(namingId === t.id ? null : t.id)}
+              className="text-xs text-slate-400 hover:text-slate-200 px-2 py-1"
+              title="Name the speakers in this transcript"
+            >
+              Name speakers
+            </button>
+            <button
               onClick={() => copyMd(t.id)}
               className="text-xs text-slate-400 hover:text-slate-200 px-2 py-1"
             >
@@ -77,6 +81,12 @@ export function TranscriptViewer() {
               Save .md
             </button>
           </div>
+          {namingId === t.id && (
+            <SpeakerNamesPanel
+              transcript={t}
+              onChange={(names) => updateSpeakerNames(t.id, names)}
+            />
+          )}
           {(t.summary || t.action_items.length > 0) && (
             <div className="mb-4 p-3 rounded bg-slate-950/40 border border-slate-800/60">
               {t.summary && (
@@ -102,10 +112,10 @@ export function TranscriptViewer() {
               <div key={i} className="flex gap-3">
                 <button
                   onClick={() => cycleSpeaker(t, i)}
-                  className="text-slate-500 w-20 text-xs pt-0.5 text-left hover:text-slate-300 cursor-pointer"
-                  title="Click to relabel speaker"
+                  className="text-slate-500 w-24 text-xs pt-0.5 text-left hover:text-slate-300 cursor-pointer truncate"
+                  title="Click to cycle speaker label"
                 >
-                  {speakerLabel(seg.speaker)}
+                  {speakerDisplayName(seg.speaker, t.speaker_names)}
                 </button>
                 <div className="text-slate-200">{seg.text}</div>
               </div>

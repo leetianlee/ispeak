@@ -17,6 +17,7 @@ use crate::meeting::pipeline::{run, DiariseOpts, Engine, ProgressSink};
 use crate::meeting::types::{
     ExportFormat, JobMode, JobState, Progress, Segment, SpeakerLabel, Transcript, TranscriptSource,
 };
+use std::collections::HashMap;
 
 /// Held in Tauri-managed state for the whole module.
 pub struct MeetingState {
@@ -405,6 +406,55 @@ pub async fn meeting_resummarise<R: Runtime>(
         },
     );
     Ok(t)
+}
+
+/// Set or clear a custom display name for a speaker label inside a transcript.
+/// `label` is the typed SpeakerLabel; key conversion happens server-side so
+/// the map key format stays canonical. `name = None` or empty clears the entry.
+/// Updates both the in-memory cache and the persistent row.
+#[tauri::command]
+pub fn meeting_set_speaker_name<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, MeetingState>,
+    transcript_id: Uuid,
+    label: SpeakerLabel,
+    name: Option<String>,
+) -> Result<HashMap<String, String>> {
+    let key = label.key();
+    let normalised = name
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
+
+    // Mutate persistent row first so we can return the canonical map.
+    let mut persisted: Option<HashMap<String, String>> = None;
+    if let Some(h) = state.history_or_init(&app) {
+        match h.set_speaker_name(transcript_id, &key, normalised.clone()) {
+            Ok(map) => persisted = Some(map),
+            Err(e) => {
+                eprintln!("[iSpeak] set_speaker_name persist failed: {e}");
+            }
+        }
+    }
+
+    // Update the in-memory cache so the current UI reflects the change.
+    let final_map = {
+        let mut results = state.last_results.lock().unwrap();
+        if let Some(t) = results.iter_mut().find(|t| t.id == transcript_id) {
+            match &normalised {
+                Some(n) => {
+                    t.speaker_names.insert(key.clone(), n.clone());
+                }
+                None => {
+                    t.speaker_names.remove(&key);
+                }
+            }
+            t.speaker_names.clone()
+        } else {
+            HashMap::new()
+        }
+    };
+
+    Ok(persisted.unwrap_or(final_map))
 }
 
 /// Rename a meeting. `None` or empty string clears the title (it'll be

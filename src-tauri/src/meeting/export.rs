@@ -40,7 +40,7 @@ fn render_markdown(t: &Transcript) -> String {
     }
     s.push_str("\n## Transcript\n\n");
     for seg in &t.segments {
-        let speaker = label(&seg.speaker);
+        let speaker = display_name(&seg.speaker, t);
         s.push_str(&format!("**{}**: {}\n\n", speaker, seg.text));
     }
     s
@@ -49,9 +49,22 @@ fn render_markdown(t: &Transcript) -> String {
 fn render_plain(t: &Transcript) -> String {
     let mut s = String::new();
     for seg in &t.segments {
-        s.push_str(&format!("{}: {}\n", label(&seg.speaker), seg.text));
+        s.push_str(&format!("{}: {}\n", display_name(&seg.speaker, t), seg.text));
     }
     s
+}
+
+/// Resolve the display name for a speaker label in the context of a transcript.
+/// Custom name from `speaker_names` wins; otherwise falls back to the default
+/// "You" / "Speaker" / "Speaker A" labels.
+fn display_name(l: &SpeakerLabel, t: &Transcript) -> String {
+    if let Some(custom) = t.speaker_names.get(&l.key()) {
+        let trimmed = custom.trim();
+        if !trimmed.is_empty() {
+            return trimmed.to_string();
+        }
+    }
+    label(l)
 }
 
 fn label(l: &SpeakerLabel) -> String {
@@ -125,6 +138,7 @@ mod tests {
             action_items: vec![],
             partial: false,
             title: None,
+            speaker_names: std::collections::HashMap::new(),
         }
     }
 
@@ -150,5 +164,24 @@ mod tests {
         let txt = render(&sample_transcript(), ExportFormat::PlainText);
         let lines: Vec<&str> = txt.trim().split('\n').collect();
         assert_eq!(lines.len(), 2);
+    }
+
+    #[test]
+    fn markdown_uses_custom_speaker_names_when_present() {
+        let mut t = sample_transcript();
+        t.speaker_names.insert("other".into(), "Alice".into());
+        t.speaker_names.insert("indexed:1".into(), "Bob".into());
+        let md = render(&t, ExportFormat::Markdown);
+        assert!(md.contains("**Alice**: Hello team."));
+        assert!(md.contains("**Bob**: Hi."));
+        assert!(!md.contains("**Speaker B**"));
+    }
+
+    #[test]
+    fn empty_custom_name_falls_back_to_default() {
+        let mut t = sample_transcript();
+        t.speaker_names.insert("other".into(), "   ".into());
+        let md = render(&t, ExportFormat::Markdown);
+        assert!(md.contains("**Speaker**: Hello team."));
     }
 }

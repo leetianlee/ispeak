@@ -25,7 +25,8 @@ CREATE TABLE IF NOT EXISTS meetings (
     action_items    TEXT    NOT NULL DEFAULT '[]',
     segments_json   TEXT    NOT NULL,
     partial         INTEGER NOT NULL DEFAULT 0,
-    title           TEXT
+    title           TEXT,
+    speaker_names   TEXT    NOT NULL DEFAULT '{}'
 );
 
 CREATE INDEX IF NOT EXISTS meetings_created_idx ON meetings(created_at DESC);
@@ -49,6 +50,17 @@ fn migrate(conn: &Connection) -> rusqlite::Result<()> {
         .collect::<rusqlite::Result<Vec<_>>>()?;
     if !cols.iter().any(|c| c == "title") {
         conn.execute("ALTER TABLE meetings ADD COLUMN title TEXT", [])?;
+    }
+    // v3 (Polish #3): per-transcript speaker_names JSON map.
+    let cols: Vec<String> = conn
+        .prepare("PRAGMA table_info(meetings)")?
+        .query_map([], |r| r.get::<_, String>(1))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    if !cols.iter().any(|c| c == "speaker_names") {
+        conn.execute(
+            "ALTER TABLE meetings ADD COLUMN speaker_names TEXT NOT NULL DEFAULT '{}'",
+            [],
+        )?;
     }
     Ok(())
 }
@@ -90,14 +102,16 @@ impl History {
             .map_err(|e| AppError::Meeting(format!("encode action_items: {e}")))?;
         let segments = serde_json::to_string(&t.segments)
             .map_err(|e| AppError::Meeting(format!("encode segments: {e}")))?;
+        let speaker_names = serde_json::to_string(&t.speaker_names)
+            .map_err(|e| AppError::Meeting(format!("encode speaker_names: {e}")))?;
         let body = fts_body(t);
 
         let conn = self.conn.lock().unwrap();
         conn.execute(
             "INSERT OR REPLACE INTO meetings
                 (id, created_at, duration_secs, source_kind, source_value,
-                 summary, action_items, segments_json, partial, title)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                 summary, action_items, segments_json, partial, title, speaker_names)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
             params![
                 t.id.to_string(),
                 t.created_at as i64,
@@ -109,6 +123,7 @@ impl History {
                 segments,
                 t.partial as i64,
                 t.title,
+                speaker_names,
             ],
         )
         .map_err(|e| AppError::Meeting(format!("insert meeting: {e}")))?;
@@ -140,7 +155,8 @@ impl History {
             let mut stmt = conn
                 .prepare(
                     "SELECT m.id, m.created_at, m.duration_secs, m.source_kind, m.source_value,
-                            m.summary, m.action_items, m.segments_json, m.partial, m.title
+                            m.summary, m.action_items, m.segments_json, m.partial, m.title,
+                            m.speaker_names
                      FROM meetings_fts f
                      JOIN meetings m ON m.id = f.id
                      WHERE meetings_fts MATCH ?1
@@ -158,7 +174,8 @@ impl History {
             let mut stmt = conn
                 .prepare(
                     "SELECT id, created_at, duration_secs, source_kind, source_value,
-                            summary, action_items, segments_json, partial, title
+                            summary, action_items, segments_json, partial, title,
+                            speaker_names
                      FROM meetings
                      ORDER BY created_at DESC
                      LIMIT ?1 OFFSET ?2",
@@ -178,7 +195,8 @@ impl History {
         let mut stmt = conn
             .prepare(
                 "SELECT id, created_at, duration_secs, source_kind, source_value,
-                        summary, action_items, segments_json, partial, title
+                        summary, action_items, segments_json, partial, title,
+                        speaker_names
                  FROM meetings WHERE id = ?1",
             )
             .map_err(map_db_err)?;
@@ -187,6 +205,46 @@ impl History {
             .optional()
             .map_err(map_db_err)?;
         Ok(row)
+    }
+
+    /// Set or clear the custom display name for a single speaker label inside
+    /// a given transcript. `None` removes the override. Returns the full
+    /// updated speaker_names map (so the caller can refresh in-memory state).
+    pub fn set_speaker_name(
+        &self,
+        id: Uuid,
+        label_key: &str,
+        name: Option<String>,
+    ) -> Result<std::collections::HashMap<String, String>> {
+        let conn = self.conn.lock().unwrap();
+        // Read existing map.
+        let json: Option<String> = conn
+            .query_row(
+                "SELECT speaker_names FROM meetings WHERE id = ?1",
+                params![id.to_string()],
+                |r| r.get(0),
+            )
+            .map_err(map_db_err)?;
+        let mut map: std::collections::HashMap<String, String> = json
+            .as_deref()
+            .map(|s| serde_json::from_str(s).unwrap_or_default())
+            .unwrap_or_default();
+        match name.map(|n| n.trim().to_string()).filter(|n| !n.is_empty()) {
+            Some(n) => {
+                map.insert(label_key.to_string(), n);
+            }
+            None => {
+                map.remove(label_key);
+            }
+        }
+        let encoded = serde_json::to_string(&map)
+            .map_err(|e| AppError::Meeting(format!("encode speaker_names: {e}")))?;
+        conn.execute(
+            "UPDATE meetings SET speaker_names = ?1 WHERE id = ?2",
+            params![encoded, id.to_string()],
+        )
+        .map_err(map_db_err)?;
+        Ok(map)
     }
 
     /// Update the user-facing title for a meeting. Empty string clears it.
@@ -272,6 +330,7 @@ fn row_to_transcript(row: &rusqlite::Row<'_>) -> rusqlite::Result<Transcript> {
     let segments_json: String = row.get(7)?;
     let partial: i64 = row.get(8)?;
     let title: Option<String> = row.get(9)?;
+    let speaker_names_json: String = row.get(10)?;
 
     let id = Uuid::parse_str(&id_str).map_err(|e| {
         rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Text, Box::new(e))
@@ -297,6 +356,8 @@ fn row_to_transcript(row: &rusqlite::Row<'_>) -> rusqlite::Result<Transcript> {
     let segments = serde_json::from_str(&segments_json).map_err(|e| {
         rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Text, Box::new(e))
     })?;
+    let speaker_names: std::collections::HashMap<String, String> =
+        serde_json::from_str(&speaker_names_json).unwrap_or_default();
 
     Ok(Transcript {
         id,
@@ -308,6 +369,7 @@ fn row_to_transcript(row: &rusqlite::Row<'_>) -> rusqlite::Result<Transcript> {
         action_items,
         partial: partial != 0,
         title,
+        speaker_names,
     })
 }
 
@@ -336,6 +398,7 @@ mod tests {
             action_items: vec!["check email".into()],
             partial: false,
             title: None,
+            speaker_names: std::collections::HashMap::new(),
         }
     }
 

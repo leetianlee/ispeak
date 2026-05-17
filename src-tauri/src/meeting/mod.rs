@@ -110,6 +110,7 @@ mod title_tests {
             action_items: vec![],
             partial: false,
             title: None,
+            speaker_names: std::collections::HashMap::new(),
         }
     }
 

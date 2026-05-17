@@ -255,6 +255,9 @@ export interface MeetingTranscript {
   partial: boolean
   /** User-facing label. Auto-generated from summary on first save; renamable. */
   title: string | null
+  /** Polish #3: per-transcript custom display names keyed by canonical
+   *  SpeakerLabel ("you", "other", "indexed:0", …). */
+  speaker_names: Record<string, string>
 }
 
 export interface MeetingProgress {
@@ -334,6 +337,49 @@ export const meetingSetTitle = (id: string, title: string | null): Promise<boole
 
 export const meetingResummarise = (id: string): Promise<MeetingTranscript> =>
   invoke('meeting_resummarise', { id })
+
+// ─── Polish #3: custom speaker names ───────────────────────────────────────
+
+/** Canonical key for a SpeakerLabel — must match Rust SpeakerLabel::key(). */
+export function speakerKey(s: MeetingSegment['speaker']): string {
+  switch (s.kind) {
+    case 'you':
+      return 'you'
+    case 'other':
+      return 'other'
+    case 'indexed':
+      return `indexed:${s.value}`
+  }
+}
+
+/** Default display name when no custom name has been set. */
+export function defaultSpeakerLabel(s: MeetingSegment['speaker']): string {
+  switch (s.kind) {
+    case 'you':
+      return 'You'
+    case 'other':
+      return 'Speaker'
+    case 'indexed':
+      return `Speaker ${String.fromCharCode(65 + s.value)}`
+  }
+}
+
+/** Resolve a speaker's display name in the context of a transcript. */
+export function speakerDisplayName(
+  s: MeetingSegment['speaker'],
+  speakerNames: Record<string, string>,
+): string {
+  const custom = speakerNames[speakerKey(s)]
+  if (custom && custom.trim()) return custom.trim()
+  return defaultSpeakerLabel(s)
+}
+
+export const meetingSetSpeakerName = (
+  transcriptId: string,
+  label: MeetingSegment['speaker'],
+  name: string | null,
+): Promise<Record<string, string>> =>
+  invoke('meeting_set_speaker_name', { transcriptId, label, name })
 
 // ─── Phase 3.3: manual speaker relabel ─────────────────────────────────────
 
