@@ -308,3 +308,31 @@ export const meetingGetHistory = (id: string): Promise<MeetingTranscript | null>
 
 export const meetingDeleteHistory = (id: string): Promise<boolean> =>
   invoke('meeting_delete_history', { id })
+
+// ─── Phase 3.3: manual speaker relabel ─────────────────────────────────────
+
+export const meetingSetSegmentSpeaker = (
+  transcriptId: string,
+  segmentIndex: number,
+  speaker: MeetingSegment['speaker'],
+): Promise<boolean> =>
+  invoke('meeting_set_segment_speaker', {
+    transcriptId,
+    segmentIndex,
+    speaker,
+  })
+
+/// Cycle a speaker label: You → Speaker → A → B → … → Z → You.
+export function nextSpeakerLabel(
+  current: MeetingSegment['speaker'],
+): MeetingSegment['speaker'] {
+  switch (current.kind) {
+    case 'you':
+      return { kind: 'other' }
+    case 'other':
+      return { kind: 'indexed', value: 0 }
+    case 'indexed':
+      if (current.value >= 25) return { kind: 'you' }
+      return { kind: 'indexed', value: current.value + 1 }
+  }
+}

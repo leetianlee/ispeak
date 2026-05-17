@@ -325,3 +325,54 @@ pub fn meeting_delete_history<R: Runtime>(
     };
     h.delete(id)
 }
+
+// ─── Phase 3.3: manual speaker relabel ─────────────────────────────────────
+
+/// Update the speaker on a single segment. Mutates both the in-memory result cache
+/// (so the live UI reflects the change immediately) and the persistent history row
+/// (so refreshes and searches stay consistent). Returns true if anything was changed.
+#[tauri::command]
+pub fn meeting_set_segment_speaker<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, MeetingState>,
+    transcript_id: Uuid,
+    segment_index: usize,
+    speaker: SpeakerLabel,
+) -> Result<bool> {
+    let mut changed_in_memory = false;
+    // Live cache: mutate in place.
+    {
+        let mut results = state.last_results.lock().unwrap();
+        if let Some(t) = results.iter_mut().find(|t| t.id == transcript_id) {
+            let len = t.segments.len();
+            let seg = t.segments.get_mut(segment_index).ok_or_else(|| {
+                AppError::Meeting(format!(
+                    "segment {segment_index} out of range (len {len})"
+                ))
+            })?;
+            seg.speaker = speaker.clone();
+            changed_in_memory = true;
+        }
+    }
+    // Persistent history: load, mutate, re-persist. Whichever store the transcript
+    // lives in, the update propagates.
+    if let Some(h) = state.history_or_init(&app) {
+        if let Some(mut t) = h.get(transcript_id)? {
+            let len = t.segments.len();
+            let seg = t.segments.get_mut(segment_index).ok_or_else(|| {
+                AppError::Meeting(format!(
+                    "segment {segment_index} out of range (history len {len})"
+                ))
+            })?;
+            seg.speaker = speaker;
+            h.persist(&t)?;
+            return Ok(true);
+        }
+    }
+    if !changed_in_memory {
+        return Err(AppError::Meeting(format!(
+            "transcript {transcript_id} not found"
+        )));
+    }
+    Ok(true)
+}

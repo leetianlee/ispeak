@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { MeetingProgress, MeetingTranscript } from '../lib/contract'
+import { MeetingProgress, MeetingSegment, MeetingTranscript } from '../lib/contract'
 
 interface JobView {
   id: string
@@ -15,6 +15,11 @@ interface MeetingStore {
   upsertProgress: (p: MeetingProgress) => void
   removeJob: (id: string) => void
   addTranscript: (t: MeetingTranscript) => void
+  updateSegmentSpeaker: (
+    transcriptId: string,
+    segmentIndex: number,
+    speaker: MeetingSegment['speaker'],
+  ) => void
   setLastError: (msg: string | null) => void
 }
 
@@ -41,5 +46,15 @@ export const useMeetingStore = create<MeetingStore>((set) => ({
       return { jobs: next }
     }),
   addTranscript: (t) => set((s) => ({ transcripts: [t, ...s.transcripts] })),
+  updateSegmentSpeaker: (transcriptId, segmentIndex, speaker) =>
+    set((s) => ({
+      transcripts: s.transcripts.map((t) => {
+        if (t.id !== transcriptId) return t
+        const segments = t.segments.map((seg, i) =>
+          i === segmentIndex ? { ...seg, speaker } : seg,
+        )
+        return { ...t, segments }
+      }),
+    })),
   setLastError: (msg) => set({ lastError: msg }),
 }))

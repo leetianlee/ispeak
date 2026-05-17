@@ -1,5 +1,10 @@
 import { useMeetingStore } from '../../store/useMeetingStore'
-import { meetingExport, MeetingTranscript } from '../../lib/contract'
+import {
+  meetingExport,
+  meetingSetSegmentSpeaker,
+  nextSpeakerLabel,
+  MeetingTranscript,
+} from '../../lib/contract'
 import { writeText } from '@tauri-apps/plugin-clipboard-manager'
 import { save } from '@tauri-apps/plugin-dialog'
 import { writeTextFile } from '@tauri-apps/plugin-fs'
@@ -14,6 +19,7 @@ function speakerLabel(s: MeetingTranscript['segments'][number]['speaker']): stri
 
 export function TranscriptViewer() {
   const transcripts = useMeetingStore((s) => s.transcripts)
+  const updateSegmentSpeaker = useMeetingStore((s) => s.updateSegmentSpeaker)
   if (transcripts.length === 0) return null
 
   const copyMd = async (id: string) => {
@@ -29,6 +35,21 @@ export function TranscriptViewer() {
     if (!path) return
     const md = await meetingExport(id, 'markdown')
     await writeTextFile(path, md)
+  }
+
+  const cycleSpeaker = async (
+    transcript: MeetingTranscript,
+    segIndex: number,
+  ) => {
+    const current = transcript.segments[segIndex].speaker
+    const next = nextSpeakerLabel(current)
+    // Optimistic update — backend re-persist runs async; failures revert.
+    updateSegmentSpeaker(transcript.id, segIndex, next)
+    try {
+      await meetingSetSegmentSpeaker(transcript.id, segIndex, next)
+    } catch {
+      updateSegmentSpeaker(transcript.id, segIndex, current)
+    }
   }
 
   return (
@@ -76,7 +97,13 @@ export function TranscriptViewer() {
           <div className="space-y-2 text-sm">
             {t.segments.map((seg, i) => (
               <div key={i} className="flex gap-3">
-                <div className="text-slate-500 w-20 text-xs pt-0.5">{speakerLabel(seg.speaker)}</div>
+                <button
+                  onClick={() => cycleSpeaker(t, i)}
+                  className="text-slate-500 w-20 text-xs pt-0.5 text-left hover:text-slate-300 cursor-pointer"
+                  title="Click to relabel speaker"
+                >
+                  {speakerLabel(seg.speaker)}
+                </button>
                 <div className="text-slate-200">{seg.text}</div>
               </div>
             ))}
