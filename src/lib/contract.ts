@@ -330,6 +330,11 @@ export const meetingStopLive = (jobId: string): Promise<void> =>
 export const meetingSetTitle = (id: string, title: string | null): Promise<boolean> =>
   invoke('meeting_set_title', { id, title })
 
+// ─── Polish #2: re-summarise an existing transcript ────────────────────────
+
+export const meetingResummarise = (id: string): Promise<MeetingTranscript> =>
+  invoke('meeting_resummarise', { id })
+
 // ─── Phase 3.3: manual speaker relabel ─────────────────────────────────────
 
 export const meetingSetSegmentSpeaker = (

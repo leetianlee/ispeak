@@ -3,6 +3,7 @@ import {
   meetingListHistory,
   meetingDeleteHistory,
   meetingExport,
+  meetingResummarise,
   meetingSetTitle,
   onMeetingDone,
   MeetingTranscript,
@@ -41,6 +42,7 @@ export function MeetingHistory() {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [draftTitle, setDraftTitle] = useState('')
+  const [resummarisingId, setResummarisingId] = useState<string | null>(null)
 
   const refresh = useCallback(async (q: string) => {
     setLoading(true)
@@ -94,6 +96,19 @@ export function MeetingHistory() {
   const onCopyMd = async (id: string) => {
     const md = await meetingExport(id, 'markdown')
     await writeText(md)
+  }
+
+  const onResummarise = async (id: string) => {
+    setResummarisingId(id)
+    setError(null)
+    try {
+      const updated = await meetingResummarise(id)
+      setItems((prev) => prev.map((t) => (t.id === id ? updated : t)))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setResummarisingId(null)
+    }
   }
 
   const startRename = (t: MeetingTranscript) => {
@@ -233,12 +248,24 @@ export function MeetingHistory() {
               </div>
               {isOpen && (
                 <div className="p-3 border-t border-slate-800/60">
-                  {t.summary && (
-                    <div className="mb-3">
-                      <div className="text-xs uppercase tracking-wider text-slate-500 mb-1">
-                        Summary
-                      </div>
-                      <div className="text-sm text-slate-200">{t.summary}</div>
+                  <div className="mb-3 flex items-center gap-2">
+                    <div className="text-xs uppercase tracking-wider text-slate-500">
+                      Summary
+                    </div>
+                    <button
+                      onClick={() => onResummarise(t.id)}
+                      disabled={resummarisingId === t.id}
+                      className="text-xs text-slate-500 hover:text-indigo-300 disabled:text-slate-700 disabled:cursor-wait"
+                      title="Re-run AI summarisation with current settings"
+                    >
+                      {resummarisingId === t.id ? 'Re-summarising…' : '↻ Re-summarise'}
+                    </button>
+                  </div>
+                  {t.summary ? (
+                    <div className="mb-3 text-sm text-slate-200">{t.summary}</div>
+                  ) : (
+                    <div className="mb-3 text-xs text-slate-600 italic">
+                      No summary yet — click ↻ above to generate one.
                     </div>
                   )}
                   {t.action_items.length > 0 && (

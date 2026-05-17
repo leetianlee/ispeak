@@ -342,6 +342,71 @@ pub fn meeting_delete_history<R: Runtime>(
     h.delete(id)
 }
 
+/// Re-run AI summarisation against an existing transcript. Looks up the
+/// transcript in the in-memory cache first, falls back to history. Uses the
+/// current AppSettings ai_mode — caller is responsible for switching mode
+/// in settings before invoking if they want a different model. Persists the
+/// updated transcript to history and emits meeting://done so the UI
+/// auto-refreshes.
+#[tauri::command]
+pub async fn meeting_resummarise<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, MeetingState>,
+    id: Uuid,
+) -> Result<Transcript> {
+    // 1. Locate the transcript (memory first, then history).
+    let mut transcript = {
+        let results = state.last_results.lock().unwrap();
+        results.iter().find(|t| t.id == id).cloned()
+    };
+    if transcript.is_none() {
+        if let Some(h) = state.history_or_init(&app) {
+            transcript = h.get(id)?;
+        }
+    }
+    let Some(mut t) = transcript else {
+        return Err(AppError::Meeting(format!(
+            "transcript {id} not found in memory or history"
+        )));
+    };
+
+    // 2. Clear the old summary/action items so summarise_into populates fresh.
+    t.summary = None;
+    t.action_items = Vec::new();
+
+    // 3. Run AI summarisation.
+    let settings = crate::commands::load_settings(&app);
+    summarise_into(&mut t, &settings).await;
+
+    // 4. Persist updated transcript.
+    if let Some(h) = state.history_or_init(&app) {
+        if let Err(e) = h.persist(&t) {
+            eprintln!("[iSpeak] persist re-summarised meeting failed: {e}");
+        }
+    }
+    // 5. Update in-memory cache so the live UI reflects the change.
+    {
+        let mut results = state.last_results.lock().unwrap();
+        if let Some(existing) = results.iter_mut().find(|x| x.id == id) {
+            *existing = t.clone();
+        }
+    }
+    // 6. Re-derive title only if user hasn't set one. Re-summarisation often
+    //    improves the auto-derived title, so we let it refresh when the user
+    //    never customised it.
+    crate::meeting::derive_title_if_empty(&mut t);
+
+    // 7. Emit done so MeetingHistory and TranscriptViewer refresh.
+    let _ = app.emit(
+        "meeting://done",
+        DoneEvent {
+            job_id: id,
+            transcript: t.clone(),
+        },
+    );
+    Ok(t)
+}
+
 /// Rename a meeting. `None` or empty string clears the title (it'll be
 /// re-derived on next summary regeneration). Updates the in-memory results
 /// cache too so the current UI reflects the change without a refetch.
