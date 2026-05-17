@@ -3,6 +3,7 @@ import {
   meetingListHistory,
   meetingDeleteHistory,
   meetingExport,
+  onMeetingDone,
   MeetingTranscript,
 } from '../../lib/contract'
 import { writeText } from '@tauri-apps/plugin-clipboard-manager'
@@ -59,6 +60,23 @@ export function MeetingHistory() {
     const id = setTimeout(() => void refresh(query), 250)
     return () => clearTimeout(id)
   }, [query, refresh])
+
+  // Refresh History when a new meeting completes so just-recorded transcripts
+  // appear without requiring a tab switch or page reload.
+  useEffect(() => {
+    let unlisten: (() => void) | null = null
+    let cancelled = false
+    onMeetingDone(() => {
+      void refresh(query)
+    }).then((fn) => {
+      if (cancelled) fn()
+      else unlisten = fn
+    })
+    return () => {
+      cancelled = true
+      if (unlisten) unlisten()
+    }
+  }, [refresh, query])
 
   const onDelete = async (id: string) => {
     try {
