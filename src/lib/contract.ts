@@ -253,6 +253,8 @@ export interface MeetingTranscript {
   summary: string | null
   action_items: string[]
   partial: boolean
+  /** User-facing label. Auto-generated from summary on first save; renamable. */
+  title: string | null
 }
 
 export interface MeetingProgress {
@@ -322,6 +324,11 @@ export const meetingStartLive = (source: LiveSource): Promise<string> =>
 
 export const meetingStopLive = (jobId: string): Promise<void> =>
   invoke('meeting_stop_live', { jobId })
+
+// ─── Polish #1: rename a meeting ───────────────────────────────────────────
+
+export const meetingSetTitle = (id: string, title: string | null): Promise<boolean> =>
+  invoke('meeting_set_title', { id, title })
 
 // ─── Phase 3.3: manual speaker relabel ─────────────────────────────────────
 

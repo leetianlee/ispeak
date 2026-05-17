@@ -12,7 +12,13 @@ pub fn render(transcript: &Transcript, format: ExportFormat) -> String {
 
 fn render_markdown(t: &Transcript) -> String {
     let mut s = String::new();
-    s.push_str("# Transcript\n\n");
+    let heading = t
+        .title
+        .as_deref()
+        .map(str::trim)
+        .filter(|t| !t.is_empty())
+        .unwrap_or("Transcript");
+    s.push_str(&format!("# {heading}\n\n"));
     s.push_str(&format!("- **Date**: {}\n", format_timestamp(t.created_at)));
     s.push_str(&format!("- **Duration**: {}\n", format_duration(t.duration_secs)));
     s.push_str(&format!("- **Source**: {}\n", format_source(&t.source)));
@@ -118,6 +124,7 @@ mod tests {
             summary: None,
             action_items: vec![],
             partial: false,
+            title: None,
         }
     }
 

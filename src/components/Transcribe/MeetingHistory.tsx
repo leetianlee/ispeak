@@ -3,6 +3,7 @@ import {
   meetingListHistory,
   meetingDeleteHistory,
   meetingExport,
+  meetingSetTitle,
   onMeetingDone,
   MeetingTranscript,
 } from '../../lib/contract'
@@ -38,6 +39,8 @@ export function MeetingHistory() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [draftTitle, setDraftTitle] = useState('')
 
   const refresh = useCallback(async (q: string) => {
     setLoading(true)
@@ -93,9 +96,36 @@ export function MeetingHistory() {
     await writeText(md)
   }
 
+  const startRename = (t: MeetingTranscript) => {
+    setEditingId(t.id)
+    setDraftTitle(t.title ?? '')
+  }
+
+  const commitRename = async () => {
+    if (!editingId) return
+    const id = editingId
+    const next = draftTitle.trim() || null
+    setEditingId(null)
+    try {
+      await meetingSetTitle(id, next)
+      setItems((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, title: next } : t)),
+      )
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+  }
+
   const onSaveMd = async (id: string) => {
+    const t = items.find((x) => x.id === id)
+    const slug = (t?.title ?? sourceLabel(t!))
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 60)
+    const defaultPath = `${slug || 'transcript'}.md`
     const path = await save({
-      defaultPath: 'transcript.md',
+      defaultPath,
       filters: [{ name: 'Markdown', extensions: ['md'] }],
     })
     if (!path) return
@@ -136,17 +166,51 @@ export function MeetingHistory() {
               className="rounded-md bg-slate-900/30 border border-slate-800/60"
             >
               <div className="flex items-center gap-3 p-3">
-                <button
-                  onClick={() => setExpandedId(isOpen ? null : t.id)}
-                  className="flex-1 text-left text-sm text-slate-200 hover:text-slate-50"
-                >
-                  <div className="font-medium truncate">{sourceLabel(t)}</div>
-                  <div className="text-xs text-slate-500 mt-0.5 flex gap-3">
-                    <span>{formatDate(t.created_at)}</span>
-                    <span>{formatDuration(t.duration_secs)}</span>
-                    {t.partial && <span className="text-amber-400">⚠ Partial</span>}
-                  </div>
-                </button>
+                <div className="flex-1 min-w-0">
+                  {editingId === t.id ? (
+                    <input
+                      autoFocus
+                      type="text"
+                      value={draftTitle}
+                      onChange={(e) => setDraftTitle(e.target.value)}
+                      onBlur={commitRename}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') commitRename()
+                        if (e.key === 'Escape') setEditingId(null)
+                      }}
+                      placeholder={sourceLabel(t)}
+                      className="w-full bg-slate-950/60 border border-slate-700 rounded px-2 py-1 text-sm text-slate-100 focus:outline-none focus:border-indigo-500"
+                    />
+                  ) : (
+                    <button
+                      onClick={() => setExpandedId(isOpen ? null : t.id)}
+                      onDoubleClick={(e) => {
+                        e.stopPropagation()
+                        startRename(t)
+                      }}
+                      className="block w-full text-left text-sm text-slate-200 hover:text-slate-50"
+                      title="Double-click to rename"
+                    >
+                      <div className="font-medium truncate">
+                        {t.title || sourceLabel(t)}
+                      </div>
+                      <div className="text-xs text-slate-500 mt-0.5 flex gap-3">
+                        <span>{formatDate(t.created_at)}</span>
+                        <span>{formatDuration(t.duration_secs)}</span>
+                        {t.partial && <span className="text-amber-400">⚠ Partial</span>}
+                      </div>
+                    </button>
+                  )}
+                </div>
+                {editingId !== t.id && (
+                  <button
+                    onClick={() => startRename(t)}
+                    className="text-xs text-slate-500 hover:text-slate-300 px-2 py-1"
+                    title="Rename"
+                  >
+                    ✎
+                  </button>
+                )}
                 <button
                   onClick={() => onCopyMd(t.id)}
                   className="text-xs text-slate-400 hover:text-slate-200 px-2 py-1"

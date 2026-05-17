@@ -24,7 +24,8 @@ CREATE TABLE IF NOT EXISTS meetings (
     summary         TEXT,
     action_items    TEXT    NOT NULL DEFAULT '[]',
     segments_json   TEXT    NOT NULL,
-    partial         INTEGER NOT NULL DEFAULT 0
+    partial         INTEGER NOT NULL DEFAULT 0,
+    title           TEXT
 );
 
 CREATE INDEX IF NOT EXISTS meetings_created_idx ON meetings(created_at DESC);
@@ -35,6 +36,22 @@ CREATE VIRTUAL TABLE IF NOT EXISTS meetings_fts USING fts5(
     tokenize = 'porter unicode61 remove_diacritics 2'
 );
 "#;
+
+/// Apply any forward migrations needed on an existing DB. Each step is
+/// idempotent — safe to run repeatedly.
+fn migrate(conn: &Connection) -> rusqlite::Result<()> {
+    // v2 (Polish #1): add `title` column to meetings. Older DBs created before
+    // this schema lacked it. New DBs get it from CREATE TABLE so the ALTER
+    // here is only needed for upgrades.
+    let cols: Vec<String> = conn
+        .prepare("PRAGMA table_info(meetings)")?
+        .query_map([], |r| r.get::<_, String>(1))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    if !cols.iter().any(|c| c == "title") {
+        conn.execute("ALTER TABLE meetings ADD COLUMN title TEXT", [])?;
+    }
+    Ok(())
+}
 
 pub struct History {
     conn: Mutex<Connection>,
@@ -49,6 +66,7 @@ impl History {
             .map_err(|e| AppError::Meeting(format!("open history db {}: {e}", db_path.display())))?;
         conn.execute_batch(SCHEMA_SQL)
             .map_err(|e| AppError::Meeting(format!("init history schema: {e}")))?;
+        migrate(&conn).map_err(|e| AppError::Meeting(format!("migrate history schema: {e}")))?;
         Ok(Self { conn: Mutex::new(conn) })
     }
 
@@ -59,6 +77,7 @@ impl History {
             .map_err(|e| AppError::Meeting(format!("open in-mem db: {e}")))?;
         conn.execute_batch(SCHEMA_SQL)
             .map_err(|e| AppError::Meeting(format!("init schema: {e}")))?;
+        migrate(&conn).map_err(|e| AppError::Meeting(format!("migrate schema: {e}")))?;
         Ok(Self { conn: Mutex::new(conn) })
     }
 
@@ -77,8 +96,8 @@ impl History {
         conn.execute(
             "INSERT OR REPLACE INTO meetings
                 (id, created_at, duration_secs, source_kind, source_value,
-                 summary, action_items, segments_json, partial)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                 summary, action_items, segments_json, partial, title)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
             params![
                 t.id.to_string(),
                 t.created_at as i64,
@@ -89,6 +108,7 @@ impl History {
                 action_items,
                 segments,
                 t.partial as i64,
+                t.title,
             ],
         )
         .map_err(|e| AppError::Meeting(format!("insert meeting: {e}")))?;
@@ -120,7 +140,7 @@ impl History {
             let mut stmt = conn
                 .prepare(
                     "SELECT m.id, m.created_at, m.duration_secs, m.source_kind, m.source_value,
-                            m.summary, m.action_items, m.segments_json, m.partial
+                            m.summary, m.action_items, m.segments_json, m.partial, m.title
                      FROM meetings_fts f
                      JOIN meetings m ON m.id = f.id
                      WHERE meetings_fts MATCH ?1
@@ -138,7 +158,7 @@ impl History {
             let mut stmt = conn
                 .prepare(
                     "SELECT id, created_at, duration_secs, source_kind, source_value,
-                            summary, action_items, segments_json, partial
+                            summary, action_items, segments_json, partial, title
                      FROM meetings
                      ORDER BY created_at DESC
                      LIMIT ?1 OFFSET ?2",
@@ -158,7 +178,7 @@ impl History {
         let mut stmt = conn
             .prepare(
                 "SELECT id, created_at, duration_secs, source_kind, source_value,
-                        summary, action_items, segments_json, partial
+                        summary, action_items, segments_json, partial, title
                  FROM meetings WHERE id = ?1",
             )
             .map_err(map_db_err)?;
@@ -167,6 +187,19 @@ impl History {
             .optional()
             .map_err(map_db_err)?;
         Ok(row)
+    }
+
+    /// Update the user-facing title for a meeting. Empty string clears it.
+    /// Returns true if a row was affected.
+    pub fn set_title(&self, id: Uuid, title: Option<String>) -> Result<bool> {
+        let conn = self.conn.lock().unwrap();
+        let n = conn
+            .execute(
+                "UPDATE meetings SET title = ?1 WHERE id = ?2",
+                params![title, id.to_string()],
+            )
+            .map_err(map_db_err)?;
+        Ok(n > 0)
     }
 
     pub fn delete(&self, id: Uuid) -> Result<bool> {
@@ -238,6 +271,7 @@ fn row_to_transcript(row: &rusqlite::Row<'_>) -> rusqlite::Result<Transcript> {
     let action_items_json: String = row.get(6)?;
     let segments_json: String = row.get(7)?;
     let partial: i64 = row.get(8)?;
+    let title: Option<String> = row.get(9)?;
 
     let id = Uuid::parse_str(&id_str).map_err(|e| {
         rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Text, Box::new(e))
@@ -273,6 +307,7 @@ fn row_to_transcript(row: &rusqlite::Row<'_>) -> rusqlite::Result<Transcript> {
         summary,
         action_items,
         partial: partial != 0,
+        title,
     })
 }
 
@@ -300,6 +335,7 @@ mod tests {
             summary: Some(format!("summary of {text}")),
             action_items: vec!["check email".into()],
             partial: false,
+            title: None,
         }
     }
 

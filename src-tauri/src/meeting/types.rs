@@ -75,6 +75,11 @@ pub struct Transcript {
     pub summary: Option<String>,
     pub action_items: Vec<String>,
     pub partial: bool,
+    /// User-facing label for the transcript. Auto-generated on first save from
+    /// the summary's first line (or first ~50 chars of segment text if AI is off).
+    /// User can rename via `meeting_set_title`.
+    #[serde(default)]
+    pub title: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]

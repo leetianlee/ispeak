@@ -105,6 +105,7 @@ pub async fn run(
         summary: None,
         action_items: vec![],
         partial,
+        title: None,
     })
 }
 

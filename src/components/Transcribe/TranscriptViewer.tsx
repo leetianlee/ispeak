@@ -57,6 +57,9 @@ export function TranscriptViewer() {
       <h3 className="text-sm uppercase tracking-wider text-slate-500 mb-2">Results</h3>
       {transcripts.map((t) => (
         <div key={t.id} className="mb-6 p-4 rounded-lg bg-slate-900/40 border border-slate-800">
+          {t.title && (
+            <div className="mb-2 text-base font-medium text-slate-100">{t.title}</div>
+          )}
           <div className="flex items-center gap-3 mb-3">
             <div className="text-sm text-slate-300">{Math.round(t.duration_secs)}s</div>
             {t.partial && <span className="text-xs text-amber-400">Partial</span>}

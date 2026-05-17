@@ -182,6 +182,7 @@ async fn drive_worker<R: Runtime>(
                     },
                 );
                 summarise_into(&mut transcript, &settings).await;
+                crate::meeting::derive_title_if_empty(&mut transcript);
 
                 if let Some(h) = &history {
                     if let Err(e) = h.persist(&transcript) {
@@ -339,6 +340,31 @@ pub fn meeting_delete_history<R: Runtime>(
         return Ok(false);
     };
     h.delete(id)
+}
+
+/// Rename a meeting. `None` or empty string clears the title (it'll be
+/// re-derived on next summary regeneration). Updates the in-memory results
+/// cache too so the current UI reflects the change without a refetch.
+#[tauri::command]
+pub fn meeting_set_title<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, MeetingState>,
+    id: Uuid,
+    title: Option<String>,
+) -> Result<bool> {
+    let normalised = title
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
+    {
+        let mut results = state.last_results.lock().unwrap();
+        if let Some(t) = results.iter_mut().find(|t| t.id == id) {
+            t.title = normalised.clone();
+        }
+    }
+    if let Some(h) = state.history_or_init(&app) {
+        return h.set_title(id, normalised);
+    }
+    Ok(false)
 }
 
 // ─── Phase 3.2: live capture ───────────────────────────────────────────────
