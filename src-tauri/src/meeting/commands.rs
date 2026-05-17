@@ -570,6 +570,7 @@ async fn process_live_pcm<R: Runtime>(
                 },
             );
             summarise_into(&mut transcript, &settings).await;
+            crate::meeting::derive_title_if_empty(&mut transcript);
 
             if let Some(h) = &history {
                 if let Err(e) = h.persist(&transcript) {
