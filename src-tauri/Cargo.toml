@@ -70,6 +70,7 @@ rusqlite = { version = "0.32", features = ["bundled"] }
 # macOS-only deps
 [target.'cfg(target_os = "macos")'.dependencies]
 # Frontmost app detection — objc2 already a transitive dep via tauri
+objc2 = { version = "0.6" }
 objc2-app-kit = { version = "0.3", features = ["NSWorkspace", "NSRunningApplication"] }
 objc2-foundation = { version = "0.3" }
 # Phase 3.2b: system audio capture via ScreenCaptureKit.

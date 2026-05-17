@@ -6,5 +6,7 @@
   <string>iSpeak needs microphone access to transcribe your voice.</string>
   <key>NSAccessibilityUsageDescription</key>
   <string>iSpeak needs accessibility access to paste transcribed text into other apps.</string>
+  <key>NSScreenCaptureUsageDescription</key>
+  <string>iSpeak needs screen recording access to capture system audio for meeting transcription. No video is recorded.</string>
 </dict>
 </plist>

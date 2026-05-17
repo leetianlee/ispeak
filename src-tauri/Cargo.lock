@@ -2112,6 +2112,7 @@ dependencies = [
  "hound",
  "log",
  "mp4",
+ "objc2",
  "objc2-app-kit",
  "objc2-core-audio-types",
  "objc2-core-media",

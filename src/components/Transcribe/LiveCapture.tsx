@@ -13,6 +13,7 @@ function formatElapsed(secs: number): string {
 
 export function LiveCapture() {
   const [isRecording, setIsRecording] = useState(false)
+  const [isStopping, setIsStopping] = useState(false)
   const [activeJobId, setActiveJobId] = useState<string | null>(null)
   const [source, setSource] = useState<LiveSource>('mic_only')
   const [elapsedSecs, setElapsedSecs] = useState(0)
@@ -41,15 +42,20 @@ export function LiveCapture() {
   }
 
   const stop = async () => {
-    if (!activeJobId) return
+    if (!activeJobId || isStopping) return
+    const jobId = activeJobId
+    // Flip UI state synchronously so a second click on the button can't fire
+    // meeting_stop_live again before the first call returns.
+    setIsStopping(true)
+    setIsRecording(false)
+    setActiveJobId(null)
+    setStartedAt(null)
     try {
-      await meetingStopLive(activeJobId)
+      await meetingStopLive(jobId)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
-      setIsRecording(false)
-      setActiveJobId(null)
-      setStartedAt(null)
+      setIsStopping(false)
     }
   }
 
@@ -75,10 +81,16 @@ export function LiveCapture() {
             <div className="flex-1" />
             <button
               onClick={stop}
-              className="text-sm bg-red-600 hover:bg-red-500 text-white px-3 py-1 rounded"
+              disabled={isStopping}
+              className="text-sm bg-red-600 hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-3 py-1 rounded"
             >
-              Stop & transcribe
+              {isStopping ? 'Stopping…' : 'Stop & transcribe'}
             </button>
+          </>
+        ) : isStopping ? (
+          <>
+            <div className="text-xs text-slate-500">Finalising…</div>
+            <div className="flex-1" />
           </>
         ) : (
           <>
