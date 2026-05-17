@@ -241,7 +241,7 @@ Sourced from prior research on similar projects (notably Albert Olgaard's "Typer
 | **2 — AI Layer** | Ollama integration, app context detection, context-aware prompts, cloud API options, prompt caching, custom vocabulary | **DONE** | AI-enhanced paste works with Ollama locally and Groq cloud, mode togglable in settings |
 | **3.1 — File Import** | Drag-drop ingest, chunked transcription, stitch, partial-result handling, MD/plain export | **DONE** | Drop a `.m4a`, get a structured transcript |
 | **3.2a — Mic-only live capture** | Streaming cpal record → finalise → existing pipeline | **DONE** | Click Start in Transcribe, record, click Stop & transcribe |
-| **3.2b — System audio (ScreenCaptureKit)** | SCStream audio output + mix with mic | **SCAFFOLDED** | Deps installed, stub returns "not yet wired"; full impl needs UI verification |
+| **3.2b — System audio (ScreenCaptureKit)** | SCStream audio output + mix with mic | **IMPLEMENTED, AWAITING USER VERIFY** | First run needs Screen Recording permission in System Settings → Privacy & Security |
 | **3.3 — Diarization** | Speaker labelling | **MVP (manual relabel)** | Auto-diarisation (pyannote / WhisperX) still pending; click-to-relabel ships now |
 | **3.4 — Summary + Actions** | LLM-extracted summary + action items, included in the transcript JSON and MD export | **DONE** | Transcript view shows summary card; MD export includes `## Summary` and `## Action Items` |
 | **3.5 — History + Search** | SQLite persistence + FTS5 search over summary, action items, and segment text | **DONE** | Past meetings show in the Transcribe tab; debounced search returns matches in <100ms |

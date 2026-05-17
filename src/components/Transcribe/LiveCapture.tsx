@@ -100,8 +100,8 @@ export function LiveCapture() {
               className="text-xs bg-slate-900/60 border border-slate-800 rounded px-2 py-1 text-slate-300"
             >
               <option value="mic_only">Microphone</option>
-              <option value="system_only">System audio (3.2b — not yet wired)</option>
-              <option value="mic_and_system">Mic + system (3.2b — not yet wired)</option>
+              <option value="system_only">System audio</option>
+              <option value="mic_and_system">Mic + system audio</option>
             </select>
             <div className="flex-1" />
             <button
@@ -118,8 +118,12 @@ export function LiveCapture() {
       )}
       {!isRecording && (
         <div className="mt-2 text-xs text-slate-500">
-          Records from your selected microphone. On stop, the audio is transcribed,
-          summarised, and saved to history.
+          {source === 'mic_only' &&
+            'Records from your selected microphone. On stop, the audio is transcribed, summarised, and saved to history.'}
+          {source === 'system_only' &&
+            'Records system audio (everything other apps play). First use will prompt for Screen Recording permission in System Settings.'}
+          {source === 'mic_and_system' &&
+            'Records your microphone and system audio together. First use will prompt for Screen Recording permission.'}
         </div>
       )}
     </div>
