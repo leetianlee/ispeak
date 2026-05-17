@@ -64,6 +64,9 @@ uuid = { version = "1", features = ["v4", "serde"] }
 log = "0.4"
 env_logger = "0.11"
 
+# Phase 3.5 — meeting history persistence. Bundled to avoid OS sqlite version drift.
+rusqlite = { version = "0.32", features = ["bundled"] }
+
 # macOS-only deps
 [target.'cfg(target_os = "macos")'.dependencies]
 # Frontmost app detection — objc2 already a transitive dep via tauri

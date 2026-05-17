@@ -1,6 +1,7 @@
 import { DropZone } from './DropZone'
 import { JobList } from './JobList'
 import { TranscriptViewer } from './TranscriptViewer'
+import { MeetingHistory } from './MeetingHistory'
 import { useMeetingStore } from '../../store/useMeetingStore'
 
 export function Transcribe() {
@@ -12,6 +13,7 @@ export function Transcribe() {
       <DropZone errorMessage={lastError} />
       <JobList />
       <TranscriptViewer />
+      <MeetingHistory />
     </div>
   )
 }

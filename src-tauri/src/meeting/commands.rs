@@ -9,6 +9,7 @@ use uuid::Uuid;
 
 use crate::error::{AppError, Result};
 use crate::meeting::export::render;
+use crate::meeting::history::History;
 use crate::meeting::ingest::ingest_to_pcm_file;
 use crate::meeting::jobs::{JobQueue, QueueSnapshot};
 use crate::meeting::pipeline::{run, Engine, ProgressSink};
@@ -20,6 +21,9 @@ use crate::meeting::types::{
 pub struct MeetingState {
     pub queue: Arc<JobQueue>,
     pub last_results: Arc<std::sync::Mutex<Vec<Transcript>>>,
+    /// Persistent history. Lazily opened on first use against the app data dir.
+    /// On open failure, this remains None and Phase 3.5 features no-op gracefully.
+    history: std::sync::Mutex<Option<Arc<History>>>,
 }
 
 impl MeetingState {
@@ -27,6 +31,28 @@ impl MeetingState {
         Self {
             queue: Arc::new(JobQueue::new()),
             last_results: Arc::new(std::sync::Mutex::new(Vec::new())),
+            history: std::sync::Mutex::new(None),
+        }
+    }
+
+    /// Lazily open the history DB under the app data dir. Returns `None` if the
+    /// DB couldn't be opened (logged once); subsequent calls will retry.
+    fn history_or_init<R: Runtime>(&self, app: &AppHandle<R>) -> Option<Arc<History>> {
+        let mut slot = self.history.lock().unwrap();
+        if let Some(h) = slot.as_ref() {
+            return Some(h.clone());
+        }
+        let dir = settings_app_data_dir(app);
+        match History::open(&dir) {
+            Ok(h) => {
+                let arc = Arc::new(h);
+                *slot = Some(arc.clone());
+                Some(arc)
+            }
+            Err(e) => {
+                eprintln!("[iSpeak] meeting history unavailable: {e}");
+                None
+            }
         }
     }
 }
@@ -84,9 +110,10 @@ pub async fn meeting_enqueue_file<R: Runtime>(
     let id = state.queue.enqueue(JobMode::FileImport { path: path.clone() });
     let queue = state.queue.clone();
     let results = state.last_results.clone();
+    let history = state.history_or_init(&app);
     let app_clone = app.clone();
     tokio::spawn(async move {
-        let _ = drive_worker(app_clone, queue, results).await;
+        let _ = drive_worker(app_clone, queue, results, history).await;
     });
     Ok(id)
 }
@@ -95,6 +122,7 @@ async fn drive_worker<R: Runtime>(
     app: AppHandle<R>,
     queue: Arc<JobQueue>,
     results: Arc<std::sync::Mutex<Vec<Transcript>>>,
+    history: Option<Arc<History>>,
 ) -> Result<()> {
     loop {
         let Some((job, cancel)) = queue.start_next() else { return Ok(()); };
@@ -148,6 +176,12 @@ async fn drive_worker<R: Runtime>(
                     },
                 );
                 summarise_into(&mut transcript, &settings).await;
+
+                if let Some(h) = &history {
+                    if let Err(e) = h.persist(&transcript) {
+                        eprintln!("[iSpeak] persist meeting history failed: {e}");
+                    }
+                }
 
                 results.lock().unwrap().push(transcript.clone());
                 let _ = app.emit("meeting://done", DoneEvent { job_id, transcript });
@@ -228,15 +262,66 @@ pub fn meeting_queue_snapshot(state: State<'_, MeetingState>) -> Result<QueueSna
 }
 
 #[tauri::command]
-pub fn meeting_export(
+pub fn meeting_export<R: Runtime>(
+    app: AppHandle<R>,
     state: State<'_, MeetingState>,
     transcript_id: Uuid,
     format: ExportFormat,
 ) -> Result<String> {
-    let results = state.last_results.lock().unwrap();
-    let t = results
-        .iter()
-        .find(|t| t.id == transcript_id)
-        .ok_or_else(|| AppError::Meeting(format!("transcript {transcript_id} not found")))?;
-    Ok(render(t, format))
+    // Try the in-memory cache first (cheaper, hot path).
+    {
+        let results = state.last_results.lock().unwrap();
+        if let Some(t) = results.iter().find(|t| t.id == transcript_id) {
+            return Ok(render(t, format));
+        }
+    }
+    // Fall through to persistent history (Phase 3.5) — lets users export old meetings.
+    if let Some(h) = state.history_or_init(&app) {
+        if let Some(t) = h.get(transcript_id)? {
+            return Ok(render(&t, format));
+        }
+    }
+    Err(AppError::Meeting(format!(
+        "transcript {transcript_id} not found"
+    )))
+}
+
+// ─── Phase 3.5: persistent history ─────────────────────────────────────────
+
+#[tauri::command]
+pub fn meeting_list_history<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, MeetingState>,
+    query: Option<String>,
+    limit: Option<u32>,
+    offset: Option<u32>,
+) -> Result<Vec<Transcript>> {
+    let Some(h) = state.history_or_init(&app) else {
+        return Ok(Vec::new());
+    };
+    h.list(query.as_deref(), limit.unwrap_or(50), offset.unwrap_or(0))
+}
+
+#[tauri::command]
+pub fn meeting_get_history<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, MeetingState>,
+    id: Uuid,
+) -> Result<Option<Transcript>> {
+    let Some(h) = state.history_or_init(&app) else {
+        return Ok(None);
+    };
+    h.get(id)
+}
+
+#[tauri::command]
+pub fn meeting_delete_history<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, MeetingState>,
+    id: Uuid,
+) -> Result<bool> {
+    let Some(h) = state.history_or_init(&app) else {
+        return Ok(false);
+    };
+    h.delete(id)
 }

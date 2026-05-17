@@ -4,6 +4,7 @@
 pub mod chunker;
 pub mod commands;
 pub mod export;
+pub mod history;
 pub mod ingest;
 pub mod jobs;
 pub mod pipeline;

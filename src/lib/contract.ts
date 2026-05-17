@@ -287,3 +287,24 @@ export const onMeetingDone = (cb: (e: MeetingDoneEvent) => void): Promise<Unlist
 
 export const onMeetingError = (cb: (e: MeetingErrorEvent) => void): Promise<UnlistenFn> =>
   listen<MeetingErrorEvent>('meeting://error', (e) => cb(e.payload))
+
+// ─── Phase 3.5: persistent history ─────────────────────────────────────────
+
+export interface MeetingHistoryListOpts {
+  query?: string | null
+  limit?: number
+  offset?: number
+}
+
+export const meetingListHistory = (opts: MeetingHistoryListOpts = {}): Promise<MeetingTranscript[]> =>
+  invoke('meeting_list_history', {
+    query: opts.query ?? null,
+    limit: opts.limit ?? null,
+    offset: opts.offset ?? null,
+  })
+
+export const meetingGetHistory = (id: string): Promise<MeetingTranscript | null> =>
+  invoke('meeting_get_history', { id })
+
+export const meetingDeleteHistory = (id: string): Promise<boolean> =>
+  invoke('meeting_delete_history', { id })

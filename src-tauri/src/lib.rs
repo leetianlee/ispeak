@@ -127,6 +127,9 @@ pub fn run() {
             crate::meeting::commands::meeting_cancel,
             crate::meeting::commands::meeting_queue_snapshot,
             crate::meeting::commands::meeting_export,
+            crate::meeting::commands::meeting_list_history,
+            crate::meeting::commands::meeting_get_history,
+            crate::meeting::commands::meeting_delete_history,
         ])
         .run(tauri::generate_context!())
         .expect("error while running iSpeak");
