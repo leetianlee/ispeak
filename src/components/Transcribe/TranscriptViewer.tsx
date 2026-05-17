@@ -53,6 +53,26 @@ export function TranscriptViewer() {
               Save .md
             </button>
           </div>
+          {(t.summary || t.action_items.length > 0) && (
+            <div className="mb-4 p-3 rounded bg-slate-950/40 border border-slate-800/60">
+              {t.summary && (
+                <div className="mb-3">
+                  <div className="text-xs uppercase tracking-wider text-slate-500 mb-1">Summary</div>
+                  <div className="text-sm text-slate-200">{t.summary}</div>
+                </div>
+              )}
+              {t.action_items.length > 0 && (
+                <div>
+                  <div className="text-xs uppercase tracking-wider text-slate-500 mb-1">Action items</div>
+                  <ul className="text-sm text-slate-200 space-y-1 list-disc list-inside">
+                    {t.action_items.map((item, i) => (
+                      <li key={i}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
           <div className="space-y-2 text-sm">
             {t.segments.map((seg, i) => (
               <div key={i} className="flex gap-3">

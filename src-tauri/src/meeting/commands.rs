@@ -12,7 +12,9 @@ use crate::meeting::export::render;
 use crate::meeting::ingest::ingest_to_pcm_file;
 use crate::meeting::jobs::{JobQueue, QueueSnapshot};
 use crate::meeting::pipeline::{run, Engine, ProgressSink};
-use crate::meeting::types::{ExportFormat, JobMode, JobState, Progress, Transcript, TranscriptSource};
+use crate::meeting::types::{
+    ExportFormat, JobMode, JobState, Progress, Segment, SpeakerLabel, Transcript, TranscriptSource,
+};
 
 /// Held in Tauri-managed state for the whole module.
 pub struct MeetingState {
@@ -132,7 +134,21 @@ async fn drive_worker<R: Runtime>(
         let _ = std::fs::remove_dir_all(&cache_dir);
 
         match transcript_result {
-            Ok(transcript) => {
+            Ok(mut transcript) => {
+                // Phase 3.4: summarise + extract action items. Non-fatal; we never block
+                // delivery of the transcript on AI failure.
+                queue.update_state(job_id, JobState::Summarizing);
+                let _ = app.emit(
+                    "meeting://progress",
+                    ProgressEvent {
+                        job_id,
+                        state: "summarising".into(),
+                        chunks_done: transcript.segments.len() as u32,
+                        chunks_total: transcript.segments.len() as u32,
+                    },
+                );
+                summarise_into(&mut transcript, &settings).await;
+
                 results.lock().unwrap().push(transcript.clone());
                 let _ = app.emit("meeting://done", DoneEvent { job_id, transcript });
                 queue.finish_running(JobState::AwaitingUserSave);
@@ -143,6 +159,44 @@ async fn drive_worker<R: Runtime>(
             }
         }
     }
+}
+
+/// Run AI summarisation on the transcript and populate `summary` + `action_items` in
+/// place. Any failure (AI off, network down, parse error) is logged and ignored —
+/// the transcript ships either way.
+async fn summarise_into(transcript: &mut Transcript, settings: &crate::settings::AppSettings) {
+    let plain = render_segments_plain(&transcript.segments);
+    if plain.trim().is_empty() {
+        return;
+    }
+    match crate::ai::summarize_meeting(&plain, &settings.ai_mode, settings).await {
+        Ok(Some(summary)) => {
+            transcript.summary = Some(summary.summary);
+            transcript.action_items = summary.action_items;
+        }
+        Ok(None) => {
+            // AI mode is Off — leave fields unset.
+        }
+        Err(e) => {
+            eprintln!("[iSpeak] meeting summarisation failed: {e}");
+        }
+    }
+}
+
+fn render_segments_plain(segments: &[Segment]) -> String {
+    let mut out = String::new();
+    for seg in segments {
+        let speaker = match &seg.speaker {
+            SpeakerLabel::You => "You",
+            SpeakerLabel::Other => "Speaker",
+            SpeakerLabel::Indexed(n) => {
+                out.push_str(&format!("Speaker {}: {}\n", (b'A' + *n) as char, seg.text));
+                continue;
+            }
+        };
+        out.push_str(&format!("{}: {}\n", speaker, seg.text));
+    }
+    out
 }
 
 fn select_engine<R: Runtime>(settings: &crate::settings::AppSettings, app: &AppHandle<R>) -> Engine {

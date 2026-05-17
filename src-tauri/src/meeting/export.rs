@@ -19,6 +19,19 @@ fn render_markdown(t: &Transcript) -> String {
     if t.partial {
         s.push_str("- **Status**: ⚠ Partial (some chunks failed or job was cancelled)\n");
     }
+    if let Some(summary) = &t.summary {
+        if !summary.is_empty() {
+            s.push_str("\n## Summary\n\n");
+            s.push_str(summary);
+            s.push_str("\n");
+        }
+    }
+    if !t.action_items.is_empty() {
+        s.push_str("\n## Action Items\n\n");
+        for item in &t.action_items {
+            s.push_str(&format!("- {}\n", item));
+        }
+    }
     s.push_str("\n## Transcript\n\n");
     for seg in &t.segments {
         let speaker = label(&seg.speaker);

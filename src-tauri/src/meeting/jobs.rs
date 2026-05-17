@@ -82,6 +82,13 @@ impl JobQueue {
         }
     }
 
+    pub fn update_state(&self, id: Uuid, state: JobState) {
+        let mut g = self.inner.lock().unwrap();
+        if let Some(r) = g.running.as_mut() {
+            if r.job.id == id { r.job.state = state; }
+        }
+    }
+
     pub fn snapshot(&self) -> QueueSnapshot {
         let g = self.inner.lock().unwrap();
         QueueSnapshot {
